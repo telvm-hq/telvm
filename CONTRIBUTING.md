@@ -10,7 +10,7 @@ Thanks for helping improve telvm. This document covers how to work on the repo a
 
 ## Development setup
 
-- **Docker (recommended):** see the root [README](README.md) — `docker compose up --build`, tests via `docker compose --profile test run --rm companion_test`.
+- **Docker (recommended):** [docs/quickstart.md](docs/quickstart.md) — `docker compose up --build`, tests via `docker compose --profile test run --rm companion_test`.
 - **Local Elixir:** from `companion/`, `mix setup` then `mix phx.server` with Postgres as in `config/dev.exs`.
 
 ## Before you open a PR
