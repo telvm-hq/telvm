@@ -2,6 +2,13 @@
 
 telvm is a **Phoenix** application (**companion**) on **your computer** that talks to **Docker Engine** over a Unix socket using **Finch**, exposes a **browser UI** (LiveView) and a **JSON + SSE HTTP API** under `/telvm/api`, and **reverse-proxies** HTTP to containers on the Docker bridge via **`CompanionWeb.ProxyPlug`**.
 
+**Read order**
+
+- **Visual overview (Mermaid + icons)** — [docs/assets/ARCHITECTURE-DIAGRAM.md](docs/assets/ARCHITECTURE-DIAGRAM.md) (companion as host peer to Docker Engine; one port `:4000`).
+- **Why Elixir / OTP and the Docker socket** — [OTP, Finch, and the Docker Unix socket](#otp-finch-and-the-docker-unix-socket) and [Why Elixir / OTP](#why-elixir--otp).
+- **Integrating an agent or script** — start with [docs/agent-api.md](docs/agent-api.md), then [docs/plumbing.md](docs/plumbing.md) for why the UI and **`/telvm/api/stream`** share some lifecycle events (and which updates are UI-only), then [`machine_controller.ex`](companion/lib/companion_web/machine_controller.ex) for implementation details.
+- **Running the stack locally** — [docs/quickstart.md](docs/quickstart.md) and the Compose diagram under [Host, Compose, and a single published port](#host-compose-and-a-single-published-port) below.
+
 ## One-glance mental model (ASCII)
 
 **You publish one host port (`:4000`).** Container workloads usually **do not** get their own `localhost:<random>` port. Instead, **path-based preview** on the companion maps a **branded URL shape** to **container + in-container port** on the Docker bridge.
@@ -16,7 +23,9 @@ The stable prefix is **`/app/`** (not a session cookie path). Today’s contract
 +------------------------------------------------------------------+
 | YOUR COMPUTER — one published port :4000                         |
 |                                                                  |
-|  [ Browser / agents ]                                            |
+|  [ Browser — LiveView, /app, /explore ] ----+                    |
+|                                              +--> :4000          |
+|  [ Agents / curl — /telvm/api ] ------------+                    |
 |           |                                                      |
 |           |  http://localhost:4000/app/<name>/port/<n>/…       |
 |           |  http://localhost:4000/telvm/api/…   (JSON/SSE)    |
@@ -147,14 +156,49 @@ Examples (see [`CompanionWeb.ProxyPlug.parse_app_path/1`](companion/lib/companio
 
 Still **planned** (among other roadmap items): richer session UX, per-session `DynamicSupervisor`, `ContainerManager`, `HealthMonitor`, and deeper sandbox automation.
 
+## OTP, Finch, and the Docker Unix socket
+
+The companion does not shell out to the `docker` CLI for control-plane calls. It speaks the **Docker Engine HTTP API** over the **Unix domain socket** (`docker.sock` by default), using **Finch** connection pools defined in [`application.ex`](companion/lib/companion/application.ex):
+
+- **`:default`** pool — general HTTP (including **ProxyPlug** forwards to `http://<container>:<port>/…` on the bridge).
+- **`{:http, {:local, sock}}`** pool — **HTTP/1 only** to the Engine on the socket (`hostname: "localhost"` in `conn_opts` is how Mint/Finch addresses UDS HTTP).
+
+That split keeps **many concurrent** Engine requests (list, inspect, exec, attach) and **many concurrent** proxy streams from fighting for the same pool limits.
+
+```mermaid
+flowchart TB
+  subgraph supervised [Supervised stack]
+    sup["Companion.Supervisor rest_for_one"]
+    finch["Finch Companion.Finch"]
+    pubsub["Phoenix PubSub"]
+    dyn["DynamicSupervisor RunnerDynamicSupervisor"]
+    ep["Endpoint :4000"]
+  end
+  defaultPool["Pool default"]
+  udsPool["Pool HTTP over unix"]
+  uds["docker.sock"]
+  engine["Docker Engine"]
+  sup --> finch
+  sup --> pubsub
+  sup --> dyn
+  sup --> ep
+  finch --> defaultPool
+  finch --> udsPool
+  udsPool <-->|HTTP1| uds
+  uds <--> engine
+```
+
+**Benefit:** OTP-style **process-per-request** (or per-connection) semantics for LiveView, SSE, and plugs means **blocking or slow Docker I/O** in one client does not require a giant thread pool; the VM schedules **many lightweight processes** over a small number of pooled connections.
+
 ## Why Elixir / OTP
 
-- **Fault containment:** supervision + `DynamicSupervisor` so one bad container or stream does not tear down the whole node.
-- **Concurrent I/O:** Docker API calls and proxy traffic map to processes without manual thread pools.
-- **LiveView:** long-lived connections suit operator-style UIs.
-- **Testable adapters:** `Companion.Docker` behaviour + mock keeps the HTTP-over-socket adapter honest.
+- **Fault containment:** **`Companion.Supervisor`** uses **`:rest_for_one`** so if a foundational child fails, dependents restart in order. **`DynamicSupervisor`** starts **`Companion.VmLifecycle.Runner`** processes on demand for VM manager pre-flight—runaway lab work is easier to bound than a single global worker.
+- **Unix socket + HTTP in one client:** Finch’s **local socket pool** gives you **keep-alive and concurrency caps** against `docker.sock` without inventing a separate transport stack; **`Companion.Docker.HTTP`** uses **`Finch.build/5`** and **`Finch.request/3`** against **`Companion.Finch`** (including `unix_socket:` on the request).
+- **Concurrent I/O:** Docker API calls, **ProxyPlug** streaming, and LiveView channels are **process-isolated**; you get back-pressure and failure modes per connection instead of one shared mutable client.
+- **LiveView + PubSub:** long-lived operator UI; internal **`Phoenix.PubSub`** broadcasts feed both **LiveView** (`handle_info`) and **`MachineController`** SSE subscribers ([Plumbing](docs/plumbing.md)).
+- **Testable adapters:** `Companion.Docker` **behaviour** + **`Mock`** keeps the HTTP-over-socket contract covered in CI without a real Engine.
 
-“Telecom-grade” in marketing often implies five-nines; what you get from OTP here is **explicit supervision**, **process isolation**, and a **single gateway port**—not magic reliability without good Docker and app semantics.
+“Telecom-grade” in marketing often implies five-nines; what you get from OTP here is **explicit supervision**, **process isolation**, **pooled UDS HTTP to Docker**, and a **single gateway port**—not magic reliability without good Docker and app semantics.
 
 ## Status (shipping)
 

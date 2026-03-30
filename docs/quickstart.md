@@ -1,5 +1,7 @@
 # Quick start and runbook
 
+**Same spine as the [README](../README.md#start-here-60-seconds):** after Compose is up, **`localhost:4000`** serves the **operator UI** (`/`, `/machines`, `/topology`), the **Machine API** at **`/telvm/api`** for agents and scripts ([agent-api.md](agent-api.md)), **Preview** at **`/app/<container>/port/<n>/…`**, and **Explorer** (read-only Monaco) at **`/explore/:id`**. Glossary: [README — Glossary](../README.md#glossary).
+
 ## Docker (recommended)
 
 Prerequisites: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or a compatible Engine).
@@ -8,7 +10,7 @@ Prerequisites: [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 docker compose up --build
 ```
 
-Open [http://localhost:4000/machines](http://localhost:4000/machines) for the **Machines** tab (container list, lab controls, and **VM manager pre-flight**). The same LiveView shell also exposes **checks** (`/`) and **topology** (`/topology`). Legacy bookmarks **`/images`**, **`/vm-manager-preflight`**, and **`/certificate`** redirect to **`/machines`** on full page load. **Explorer** is at **`/explore/:id`** (full-viewport shell for deep visibility into a workload).
+Open [http://localhost:4000/machines](http://localhost:4000/machines) for the **Machines** tab (container list, lab controls, and **VM manager pre-flight**). The same LiveView shell also exposes **checks** (`/`) and **topology** (`/topology`). Legacy bookmarks **`/images`**, **`/vm-manager-preflight`**, and **`/certificate`** redirect to **`/machines`** on full page load. **Explorer** is at **`/explore/:id`** (full-viewport shell for deep visibility into a workload). For **Cursor**-style automation without the browser, use **[Machine API](agent-api.md)** (`/telvm/api/…`).
 
 Platform pre-flight on `/` covers Postgres, Docker socket, **Finch → Docker Engine** (`GET /version` + labeled container discovery for `vm_node`), ProxyPlug contract, and related rows. The VM manager pre-flight flow runs a scripted lifecycle (ephemeral lab container + HTTP probe) via `Companion.VmLifecycle.Runner`. Updates use **Phoenix PubSub** (`preflight:updates` and `lifecycle:vm_manager_preflight`). Default Compose brings up **db**, **vm_node** (Node 22 + `telvm.sandbox=true`), and **companion**. The companion container bind-mounts `./companion` and uses named volumes for `deps`, `_build`, and `assets/node_modules`.
 
