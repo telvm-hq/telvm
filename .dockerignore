@@ -1,0 +1,6 @@
+.git
+.internal
+companion/_build
+companion/deps
+companion/assets/node_modules
+companion/priv/static/assets

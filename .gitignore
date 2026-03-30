@@ -1,0 +1,46 @@
+# Private planning and strategy docs -- NEVER commit
+.internal/
+
+# Elixir / Phoenix (companion app)
+# Never commit build artifacts or deps — verify with: git status (should not list _build/ or deps/)
+companion/_build/
+companion/deps/
+companion/.elixir_ls/
+companion/*.beam
+companion/*.ez
+companion/erl_crash.dump
+companion/*.plt
+companion/*.plt.hash
+companion/priv/static/assets/
+
+# If you run npm/yarn on the host inside companion/assets/
+companion/assets/node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs & caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# DETS persistence files (future)
+*.dets

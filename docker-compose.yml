@@ -1,0 +1,90 @@
+# Primary local entrypoint: Phoenix "companion" + Postgres.
+# Mounts the host repo into the container so Mix/Phoenix run inside Linux (recommended on Windows/macOS).
+name: telvm
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: companion_dev
+    volumes:
+      - telvm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Stand-in "companion VM" (BYOI preview): arbitrary Node container with telvm labels for Engine API discovery.
+  vm_node:
+    image: node:22-alpine
+    command:
+      - node
+      - -e
+      - "require('http').createServer((q,r)=>r.end('ok')).listen(3333,'0.0.0.0')"
+    labels:
+      telvm.sandbox: "true"
+      telvm.runtime: "node"
+
+  companion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./companion:/app
+      - companion_deps:/app/deps
+      - companion_build:/app/_build
+      - companion_assets_node:/app/assets/node_modules
+      # Host Docker API (or Docker Desktop proxy) for future Engine HTTP adapter.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Lab image Dockerfiles for in-container `docker build`.
+      - ./images:/images:ro
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/companion_dev
+      PHX_HTTP_IP: 0.0.0.0
+      PHX_SERVER: "true"
+      PORT: "4000"
+      # Ephemeral VM manager pre-flight lab container: same Compose network + fixed DNS alias for probes.
+      TELVM_LAB_DOCKER_NETWORK: telvm_default
+      TELVM_LAB_DNS_ALIAS: telvm-lab-workload
+      # Optional: after publishing images/go-http-lab to GHCR, set in .env (see .env.example):
+      # TELVM_LAB_IMAGE=ghcr.io/<your-org>/telvm-go-http-lab:main
+      # TELVM_LAB_USE_IMAGE_CMD=1
+    depends_on:
+      db:
+        condition: service_healthy
+      vm_node:
+        condition: service_started
+
+  # One-shot test runner (canonical local/CI-style run inside Linux). Does not start phx.server.
+  # Usage: docker compose --profile test run --rm companion_test
+  companion_test:
+    profiles:
+      - test
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./companion:/app
+      - companion_deps:/app/deps
+      - companion_build:/app/_build
+      - companion_assets_node:/app/assets/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./images:/images:ro
+    environment:
+      MIX_ENV: test
+      TEST_DATABASE_URL: postgres://postgres:postgres@db:5432/companion_test
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "mix deps.get && mix test"]
+
+volumes:
+  telvm_pgdata:
+  companion_deps:
+  companion_build:
+  companion_assets_node:
