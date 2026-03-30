@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="360" viewBox="0 0 920 360">
+  <rect width="100%" height="100%" fill="#0d1117"/>
+  <text x="460" y="175" fill="#8b949e" font-family="system-ui,sans-serif" font-size="16" text-anchor="middle">
+    Replace with your Canva banner  export as telvm-banner.png
+  </text>
+  <text x="460" y="205" fill="#58a6ff" font-family="system-ui,sans-serif" font-size="13" text-anchor="middle">
+    See docs/assets/BANNER.md
+  </text>
+</svg>
