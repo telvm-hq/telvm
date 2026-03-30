@@ -4,30 +4,48 @@ telvm is a **Phoenix** application (**companion**) on **your computer** that tal
 
 ## One-glance mental model (ASCII)
 
+**You publish one host port (`:4000`).** Container workloads usually **do not** get their own `localhost:<random>` port. Instead, **path-based preview** on the companion maps a **branded URL shape** to **container + in-container port** on the Docker bridge.
+
+The stable prefix is **`/app/`** (not a session cookie path). Today’s contract is:
+
+`http://localhost:4000/app/<container_name>/port/<port_number>/<path…>`
+
+…which **`ProxyPlug`** turns into `http://<container_name>:<port_number>/<path…>` using **bridge DNS** (`container_name` must resolve on the Compose network). See [`proxy_plug.ex`](companion/lib/companion_web/proxy_plug.ex).
+
 ```
 +------------------------------------------------------------------+
-|  YOUR COMPUTER (one Docker host)                                 |
+| YOUR COMPUTER — one published port :4000                         |
 |                                                                  |
-|   [ Browser / agents ] ----http://localhost:4000---->            |
-|                              |                                   |
-|                              v                                   |
-|                    +-------------------+                         |
-|                    | telvm companion   |                         |
-|                    | (Phoenix + API)   |                         |
-|                    +---------+---------+                         |
-|                              |                                   |
-|              +---------------+---------------+                   |
-|              |         Docker Engine         |                  |
-|              |   (containers, networks, API)   |                  |
-|              +---+---+---------------+---+---+                  |
-|                  |   |               |   |                      |
-|                  v   v               v   v                      |
-|            [Container 1] ... [Container N]                      |
-|            (any image, BYOI)   (preview / exec / files)        |
+|  [ Browser / agents ]                                            |
+|           |                                                      |
+|           |  http://localhost:4000/app/<name>/port/<n>/…       |
+|           |  http://localhost:4000/telvm/api/…   (JSON/SSE)    |
+|           v                                                      |
+|  +------------------------ companion ---------------------------+ |
+|  |  CompanionWeb.ProxyPlug runs FIRST (before the router)     | |
+|  |  /app/<container>/port/<n>/…  --->  Finch HTTP client      | |
+|  |         |                              |                   | |
+|  |         |  forward to                  |  everything else | |
+|  |         v                              v  (/, /machines,    | |
+|  |   http://<container>:<n>/…            |   /explore, …)   | |
+|  |   (bridge network DNS + port)          +--> Router/LiveView | |
+|  +------------------------|----------------|-------------------+ |
+|                           |                |                      |
+|                           |  Docker Engine API (UNIX socket)     |
+|                           v                                      |
+|                    +-------------+                               |
+|                    |Docker Engine|                               |
+|                    +------+------+                               |
+|                           |                                      |
+|                           v                                      |
+|              [ Container A :3000 ] … [ Container N :… ]          |
+|              BYOI; internal ports stay on the bridge (not host)   |
 +------------------------------------------------------------------+
 ```
 
-**Caption:** Companion talks to Docker Engine; you use **one local port** (4000); everything else is **containers** the Engine runs. This is a **local** control plane—not a hosted telecom product.
+**Why this is not “random localhost ports”:** You are not opening **N host ports** for **N** container ports. You keep **one** entrypoint (`:4000`) and encode **which container** and **which internal port** in the **path** (`/app/.../port/<n>/...`). That is the graceful mapping: **slug (path) → container:port on the bridge**.
+
+**Caption:** One local port; Engine runs the VMs; companion **terminates HTTP** and **proxies** `/app/…` to the right **container:port**; **Explorer** and **`/telvm/api`** use the same host for visibility and automation.
 
 ## Agents, preview, and Explorer (why this matters)
 

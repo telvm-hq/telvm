@@ -28,14 +28,22 @@
 
 ### At a glance (same idea as the banner you can draw in Canva)
 
+One **localhost** port (**4000**). **Preview** uses a **path** on that port, not a separate port per container: `/app/<container>/port/<n>/…` → companion **reverse-proxies** to `http://<container>:<n>/…` on the Docker bridge (details in [Architecture](ARCHITECTURE.md)).
+
 ```
 +------------------------------------------------------------------+
-|  YOUR COMPUTER (one Docker host)                                 |
-|   [ Browser / agents ] --http://localhost:4000-->  companion     |
+|  YOUR COMPUTER (one Docker host, :4000 only)                     |
+|                                                                  |
+|   [ Browser / agents ] ---- http://localhost:4000 ------------>  |
 |                              |                                   |
-|                    Docker Engine                                 |
+|                    +---------+---------+                         |
+|                    | companion       |                         |
+|                    | ProxyPlug /app… |  +  UI + /telvm/api      |
+|                    +---------+---------+                         |
+|                              |                                   |
+|                    Docker Engine (socket)                        |
 |                         |   |   |                                |
-|              [Container 1] ... [Container N]                   |
+|              [Container 1] … [Container N]                      |
 +------------------------------------------------------------------+
 ```
 
