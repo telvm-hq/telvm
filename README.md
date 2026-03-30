@@ -1,5 +1,10 @@
 # telvm
 
+[![CI](https://github.com/telvm-hq/telvm/actions/workflows/ci.yml/badge.svg)](https://github.com/telvm-hq/telvm/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Elixir](https://img.shields.io/badge/Elixir-1.17.3-4B275F?logo=elixir&logoColor=white)](https://elixir-lang.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+
 <p align="center">
   <img src="docs/assets/telvm-mascot.png" alt="Telvm mascot — cybernetic electric eel" width="420" />
 </p>
@@ -73,8 +78,15 @@ The default lab image is **`node:22-alpine`** with an inline HTTP server command
 
 **From env only:** set `TELVM_LAB_IMAGE` and **`TELVM_LAB_USE_IMAGE_CMD=1`** so Docker Engine uses the image’s own `CMD` (see [`Companion.VmLifecycle.lab_container_create_attrs/2`](companion/lib/companion/vm_lifecycle.ex)).
 
-1. CI publishes to GHCR via [`.github/workflows/publish-go-http-lab.yml`](.github/workflows/publish-go-http-lab.yml) (`ghcr.io/<owner>/telvm-go-http-lab:main` and a digest tag).
-2. For **private** packages, run `docker login ghcr.io` on the host whose Engine backs `docker.sock`.
+1. CI publishes to GHCR via [`.github/workflows/publish-go-http-lab.yml`](.github/workflows/publish-go-http-lab.yml) whenever `images/go-http-lab/**` changes on `main`. Image: **`ghcr.io/telvm-hq/telvm-go-http-lab`** (GitHub lowercases the org for the registry path). Tags include **`main`** and the commit SHA.
+2. Pull on any machine with Docker:
+
+   ```bash
+   docker pull ghcr.io/telvm-hq/telvm-go-http-lab:main
+   ```
+
+3. After the first successful publish, the package appears under the org’s **Packages** and this repo’s **Packages** sidebar on GitHub.
+4. For **private** packages, run `docker login ghcr.io` on the host whose Engine backs `docker.sock`.
 
 ### Non-interactive Phoenix scaffolding
 
@@ -254,6 +266,13 @@ when `RUN_DOCKER_TESTS=1` or similar, so default CI stays hermetic.
 | [`docker-compose.yml`](docker-compose.yml) | Local orchestration: Postgres + `vm_node` + companion + `companion_test` (profile `test`) |
 | [`Dockerfile`](Dockerfile) | Dev image (Elixir + Node + `postgresql-client`) |
 | [`docker/companion-entrypoint.sh`](docker/companion-entrypoint.sh) | deps, assets, ecto, `phx.server` |
+
+## Community
+
+- [Contributing](CONTRIBUTING.md) (tests, PRs, maintainer notes for branch protection and releases)
+- [Architecture](ARCHITECTURE.md) (public overview of the companion slice)
+- [Security policy](SECURITY.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
 
 ## License
 
