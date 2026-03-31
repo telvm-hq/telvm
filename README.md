@@ -6,7 +6,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 
 <p align="center">
-  <img src="docs/assets/telvm-banner.svg" alt="telvm: one host :4000, browser and agents to companion, Docker Engine, N containers" width="920" />
+  <img src="TELVM_IMAGE_BANNER.png" alt="telvm: Docker runtimes, localhost:4000, /telvm/api, Machines and health, eel mascot" width="920" />
 </p>
 
 ### Architecture (overview)
@@ -93,7 +93,7 @@ One **localhost** port (**4000**). **Preview** uses a **path** on that port, not
 +------------------------------------------------------------------+
 ```
 
-Replace the SVG above with your **Canva** export when ready: save as **`docs/assets/telvm-banner.png`** and point the `<img>` `src` at that file ([`docs/assets/BANNER.md`](docs/assets/BANNER.md)).
+README banner image: [`TELVM_IMAGE_BANNER.png`](TELVM_IMAGE_BANNER.png). For alternate sizes and the GitHub social preview, see [`docs/assets/BANNER.md`](docs/assets/BANNER.md).
 
 | Layer | Role |
 |--------|------|
