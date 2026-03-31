@@ -8,5 +8,5 @@
 
 ## Checklist
 
-- [ ] Tests pass (see [CONTRIBUTING.md](../CONTRIBUTING.md))
+- [ ] Tests pass (see [CONTRIBUTING.md](../docs/CONTRIBUTING.md))
 - [ ] No private strategy docs added under paths that should stay gitignored (e.g. `.internal/`)

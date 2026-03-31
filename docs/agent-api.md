@@ -46,4 +46,4 @@ Keepalive comments are sent on idle (see implementation in [`machine_controller.
 
 - [Plumbing](plumbing.md) — PubSub, operator UI vs SSE, `machines_snapshot` vs Docker pull.
 - [Quick start](quickstart.md) — run Compose, operator UI, tests.
-- [Architecture](../ARCHITECTURE.md) — ProxyPlug, router order, Docker adapter, tests.
+- [Architecture](ARCHITECTURE.md) — ProxyPlug, router order, Docker adapter, tests.

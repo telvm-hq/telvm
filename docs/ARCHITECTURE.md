@@ -4,10 +4,10 @@ telvm is a **Phoenix** application (**companion**) on **your computer** that tal
 
 **Read order**
 
-- **Visual overview (Mermaid + icons)** — [docs/assets/ARCHITECTURE-DIAGRAM.md](docs/assets/ARCHITECTURE-DIAGRAM.md) (companion as host peer to Docker Engine; one port `:4000`).
+- **Visual overview (Mermaid + icons)** — [assets/ARCHITECTURE-DIAGRAM.md](assets/ARCHITECTURE-DIAGRAM.md) (companion as host peer to Docker Engine; one port `:4000`).
 - **Why Elixir / OTP and the Docker socket** — [OTP, Finch, and the Docker Unix socket](#otp-finch-and-the-docker-unix-socket) and [Why Elixir / OTP](#why-elixir--otp).
-- **Integrating an agent or script** — start with [docs/agent-api.md](docs/agent-api.md), then [docs/plumbing.md](docs/plumbing.md) for why the UI and **`/telvm/api/stream`** share some lifecycle events (and which updates are UI-only), then [`machine_controller.ex`](companion/lib/companion_web/machine_controller.ex) for implementation details.
-- **Running the stack locally** — [docs/quickstart.md](docs/quickstart.md) and the Compose diagram under [Host, Compose, and a single published port](#host-compose-and-a-single-published-port) below.
+- **Integrating an agent or script** — start with [agent-api.md](agent-api.md), then [plumbing.md](plumbing.md) for why the UI and **`/telvm/api/stream`** share some lifecycle events (and which updates are UI-only), then [`machine_controller.ex`](../companion/lib/companion_web/machine_controller.ex) for implementation details.
+- **Running the stack locally** — [quickstart.md](quickstart.md) and the Compose diagram under [Host, Compose, and a single published port](#host-compose-and-a-single-published-port) below.
 
 ## One-glance mental model (ASCII)
 
@@ -17,7 +17,7 @@ The stable prefix is **`/app/`** (not a session cookie path). Today’s contract
 
 `http://localhost:4000/app/<container_name>/port/<port_number>/<path…>`
 
-…which **`ProxyPlug`** turns into `http://<container_name>:<port_number>/<path…>` using **bridge DNS** (`container_name` must resolve on the Compose network). See [`proxy_plug.ex`](companion/lib/companion_web/proxy_plug.ex).
+…which **`ProxyPlug`** turns into `http://<container_name>:<port_number>/<path…>` using **bridge DNS** (`container_name` must resolve on the Compose network). See [`proxy_plug.ex`](../companion/lib/companion_web/proxy_plug.ex).
 
 ```
 +------------------------------------------------------------------+
@@ -90,11 +90,11 @@ flowchart LR
 
 | Area | Role |
 |------|------|
-| [`companion/lib/companion_web/endpoint.ex`](companion/lib/companion_web/endpoint.ex) | **`ProxyPlug` runs before** the router so `/app/...` is proxied without hitting LiveView. |
-| [`companion/lib/companion_web/proxy_plug.ex`](companion/lib/companion_web/proxy_plug.ex) | Parses `/app/<container>/port/<n>/…`, forwards with Finch, **502** if upstream fails. |
-| [`companion/lib/companion_web/router.ex`](companion/lib/companion_web/router.ex) | LiveView routes (`/`, `/machines`, `/explore/:id`, …) and `/telvm/api/*` JSON API. |
-| [`companion/lib/companion/docker/`](companion/lib/companion/docker/) | Behaviour + **HTTP** (real socket) and **Mock** (tests). |
-| [`docker-compose.yml`](docker-compose.yml) | Postgres, `vm_node`, **companion**, optional **`companion_test`** profile. |
+| [`companion/lib/companion_web/endpoint.ex`](../companion/lib/companion_web/endpoint.ex) | **`ProxyPlug` runs before** the router so `/app/...` is proxied without hitting LiveView. |
+| [`companion/lib/companion_web/proxy_plug.ex`](../companion/lib/companion_web/proxy_plug.ex) | Parses `/app/<container>/port/<n>/…`, forwards with Finch, **502** if upstream fails. |
+| [`companion/lib/companion_web/router.ex`](../companion/lib/companion_web/router.ex) | LiveView routes (`/`, `/machines`, `/explore/:id`, …) and `/telvm/api/*` JSON API. |
+| [`companion/lib/companion/docker/`](../companion/lib/companion/docker/) | Behaviour + **HTTP** (real socket) and **Mock** (tests). |
+| [`docker-compose.yml`](../docker-compose.yml) | Postgres, `vm_node`, **companion**, optional **`companion_test`** profile. |
 
 ## Host, Compose, and a single published port
 
@@ -130,7 +130,7 @@ Browser traffic to sandboxes uses **`/app/<container_name>/port/<port_number>/�
   CompanionWeb.ProxyPlug  ──►  Finch → http://<container_name>:<port>/…
 ```
 
-Examples (see [`CompanionWeb.ProxyPlug.parse_app_path/1`](companion/lib/companion_web/proxy_plug.ex)):
+Examples (see [`CompanionWeb.ProxyPlug.parse_app_path/1`](../companion/lib/companion_web/proxy_plug.ex)):
 
 - `["app", "sess_abc"]` → default port **3000**, empty path.
 - `["app", "sess_abc", "index.html"]` → default port **3000**, path `index.html`.
@@ -158,7 +158,7 @@ Still **planned** (among other roadmap items): richer session UX, per-session `D
 
 ## OTP, Finch, and the Docker Unix socket
 
-The companion does not shell out to the `docker` CLI for control-plane calls. It speaks the **Docker Engine HTTP API** over the **Unix domain socket** (`docker.sock` by default), using **Finch** connection pools defined in [`application.ex`](companion/lib/companion/application.ex):
+The companion does not shell out to the `docker` CLI for control-plane calls. It speaks the **Docker Engine HTTP API** over the **Unix domain socket** (`docker.sock` by default), using **Finch** connection pools defined in [`application.ex`](../companion/lib/companion/application.ex):
 
 - **`:default`** pool — general HTTP (including **ProxyPlug** forwards to `http://<container>:<port>/…` on the bridge).
 - **`{:http, {:local, sock}}`** pool — **HTTP/1 only** to the Engine on the socket (`hostname: "localhost"` in `conn_opts` is how Mint/Finch addresses UDS HTTP).
@@ -195,21 +195,21 @@ flowchart TB
 - **Fault containment:** **`Companion.Supervisor`** uses **`:rest_for_one`** so if a foundational child fails, dependents restart in order. **`DynamicSupervisor`** starts **`Companion.VmLifecycle.Runner`** processes on demand for VM manager pre-flight—runaway lab work is easier to bound than a single global worker.
 - **Unix socket + HTTP in one client:** Finch’s **local socket pool** gives you **keep-alive and concurrency caps** against `docker.sock` without inventing a separate transport stack; **`Companion.Docker.HTTP`** uses **`Finch.build/5`** and **`Finch.request/3`** against **`Companion.Finch`** (including `unix_socket:` on the request).
 - **Concurrent I/O:** Docker API calls, **ProxyPlug** streaming, and LiveView channels are **process-isolated**; you get back-pressure and failure modes per connection instead of one shared mutable client.
-- **LiveView + PubSub:** long-lived operator UI; internal **`Phoenix.PubSub`** broadcasts feed both **LiveView** (`handle_info`) and **`MachineController`** SSE subscribers ([Plumbing](docs/plumbing.md)).
+- **LiveView + PubSub:** long-lived operator UI; internal **`Phoenix.PubSub`** broadcasts feed both **LiveView** (`handle_info`) and **`MachineController`** SSE subscribers ([Plumbing](plumbing.md)).
 - **Testable adapters:** `Companion.Docker` **behaviour** + **`Mock`** keeps the HTTP-over-socket contract covered in CI without a real Engine.
 
 “Telecom-grade” in marketing often implies five-nines; what you get from OTP here is **explicit supervision**, **process isolation**, **pooled UDS HTTP to Docker**, and a **single gateway port**—not magic reliability without good Docker and app semantics.
 
 ## Status (shipping)
 
-- [x] Phoenix **companion** under [`companion/`](companion/).
-- [x] `Companion.Docker` + [`Mock`](companion/lib/companion/docker/mock.ex) + [`HTTP`](companion/lib/companion/docker/http.ex).
-- [x] Pre-flight LiveView + [`Preflight`](companion/lib/companion/preflight.ex) + [`PreflightServer`](companion/lib/companion/preflight_server.ex).
-- [x] `CompanionWeb.ProxyPlug` + Finch forwarding; **502** upstream failure ([`proxy_plug_test.exs`](companion/test/companion_web/proxy_plug_test.exs)).
-- [x] `/telvm/api/*` — [`MachineController`](companion/lib/companion_web/machine_controller.ex) ([`machine_controller_test.exs`](companion/test/companion_web/machine_controller_test.exs)).
-- [x] `/explore/:id` — [`ExplorerLive`](companion/lib/companion_web/live/explorer_live.ex).
-- [x] [`docker-compose.yml`](docker-compose.yml) + [`Dockerfile`](Dockerfile).
-- [x] VM manager pre-flight + [`Runner`](companion/lib/companion/vm_lifecycle/runner.ex).
+- [x] Phoenix **companion** under [`companion/`](../companion/).
+- [x] `Companion.Docker` + [`Mock`](../companion/lib/companion/docker/mock.ex) + [`HTTP`](../companion/lib/companion/docker/http.ex).
+- [x] Pre-flight LiveView + [`Preflight`](../companion/lib/companion/preflight.ex) + [`PreflightServer`](../companion/lib/companion/preflight_server.ex).
+- [x] `CompanionWeb.ProxyPlug` + Finch forwarding; **502** upstream failure ([`proxy_plug_test.exs`](../companion/test/companion_web/proxy_plug_test.exs)).
+- [x] `/telvm/api/*` — [`MachineController`](../companion/lib/companion_web/machine_controller.ex) ([`machine_controller_test.exs`](../companion/test/companion_web/machine_controller_test.exs)).
+- [x] `/explore/:id` — [`ExplorerLive`](../companion/lib/companion_web/live/explorer_live.ex).
+- [x] [`docker-compose.yml`](../docker-compose.yml) + [`Dockerfile`](../Dockerfile).
+- [x] VM manager pre-flight + [`Runner`](../companion/lib/companion/vm_lifecycle/runner.ex).
 - [ ] Session supervisor, richer agent UI, full sandbox image set — next milestones.
 
 ## Test strategy
@@ -220,7 +220,7 @@ flowchart TB
 docker compose --profile test run --rm companion_test
 ```
 
-The [`companion_test`](docker-compose.yml) service runs `mix deps.get && mix test` with `MIX_ENV=test` and `TEST_DATABASE_URL=postgres://postgres:postgres@db:5432/companion_test`. [`config/test.exs`](companion/config/test.exs) reads **`TEST_DATABASE_URL`** first, then **`DATABASE_URL`**.
+The [`companion_test`](../docker-compose.yml) service runs `mix deps.get && mix test` with `MIX_ENV=test` and `TEST_DATABASE_URL=postgres://postgres:postgres@db:5432/companion_test`. [`config/test.exs`](../companion/config/test.exs) reads **`TEST_DATABASE_URL`** first, then **`DATABASE_URL`**.
 
 **Optional (host):** `cd companion && mix test` when Postgres is on `localhost` and test env vars are unset.
 
@@ -236,12 +236,12 @@ docker compose run --rm --entrypoint "" \
 
 ### Contracts under test
 
-- [`Companion.Docker.Mock`](companion/test/companion/docker_mock_test.exs)
-- [`Companion.Preflight`](companion/test/companion/preflight_test.exs)
-- [`CompanionWeb.ProxyPlug`](companion/test/companion_web/proxy_plug_test.exs)
-- [`CompanionWeb.MachineController`](companion/test/companion_web/machine_controller_test.exs)
-- [`CompanionWeb.StatusLive`](companion/test/companion_web/live/status_live_test.exs)
-- [`Companion.VmLifecycle.Runner`](companion/test/companion/vm_lifecycle_runner_test.exs)
+- [`Companion.Docker.Mock`](../companion/test/companion/docker_mock_test.exs)
+- [`Companion.Preflight`](../companion/test/companion/preflight_test.exs)
+- [`CompanionWeb.ProxyPlug`](../companion/test/companion_web/proxy_plug_test.exs)
+- [`CompanionWeb.MachineController`](../companion/test/companion_web/machine_controller_test.exs)
+- [`CompanionWeb.StatusLive`](../companion/test/companion_web/live/status_live_test.exs)
+- [`Companion.VmLifecycle.Runner`](../companion/test/companion/vm_lifecycle_runner_test.exs)
 
 **Later:** real-Engine tests tagged (e.g. `@tag :docker`) behind `RUN_DOCKER_TESTS=1`.
 
@@ -249,10 +249,10 @@ docker compose run --rm --entrypoint "" \
 
 | Path | Role |
 |------|------|
-| [`companion/`](companion/) | Phoenix application |
-| [`docker-compose.yml`](docker-compose.yml) | Postgres + `vm_node` + companion + `companion_test` (profile `test`) |
-| [`Dockerfile`](Dockerfile) | Dev image |
-| [`docker/companion-entrypoint.sh`](docker/companion-entrypoint.sh) | deps, assets, ecto, `phx.server` |
+| [`companion/`](../companion/) | Phoenix application |
+| [`docker-compose.yml`](../docker-compose.yml) | Postgres + `vm_node` + companion + `companion_test` (profile `test`) |
+| [`Dockerfile`](../Dockerfile) | Dev image |
+| [`docker/companion-entrypoint.sh`](../docker/companion-entrypoint.sh) | deps, assets, ecto, `phx.server` |
 
 ## Tests
 

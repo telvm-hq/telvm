@@ -65,4 +65,4 @@ In addition to PubSub-driven events, the SSE loop **re-lists** labeled lab machi
 ## See also
 
 - [Machine API](agent-api.md) — REST paths and SSE event names.
-- [Architecture](../ARCHITECTURE.md) — ProxyPlug order, Compose layout, tests.
+- [Architecture](ARCHITECTURE.md) — ProxyPlug order, Compose layout, tests.
