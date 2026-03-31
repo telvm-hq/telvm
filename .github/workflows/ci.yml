@@ -10,6 +10,6 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run ExUnit via Docker Compose
         run: docker compose --profile test run --rm companion_test
