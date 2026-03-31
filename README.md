@@ -6,7 +6,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 
 <p align="center">
-  <img src="TELVM_IMAGE_BANNER.png" alt="telvm: Docker runtimes, localhost:4000, /telvm/api, Machines and health, eel mascot" width="920" />
+  <img src="docs/assets/TELVM_IMAGE_BANNER.png" alt="telvm: Docker runtimes, localhost:4000, /telvm/api, Machines and health, eel mascot" width="920" />
 </p>
 
 ### Architecture (overview)
@@ -44,7 +44,7 @@ flowchart TB
 - **Fault containment:** **`:rest_for_one`** supervision plus **`DynamicSupervisor`** for VM lifecycle runners; proxy and SSE traffic map to **isolated processes** so one bad upstream or stream is less likely to take down the whole gateway.
 - **Operator UX:** **LiveView** and **PubSub** fit long-lived dashboards; **`/telvm/api/stream`** turns the same internal events into **SSE** for agents.
 
-Details: [Architecture — OTP, Finch, and the Docker Unix socket](ARCHITECTURE.md#otp-finch-and-the-docker-unix-socket) and [Why Elixir / OTP](ARCHITECTURE.md#why-elixir--otp).
+Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITECTURE.md#otp-finch-and-the-docker-unix-socket) and [Why Elixir / OTP](docs/ARCHITECTURE.md#why-elixir--otp).
 
 ## Start here (~60 seconds)
 
@@ -57,7 +57,7 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](ARCHITECTURE.
 
 4. **Preview and visibility:** **`/app/<container>/port/<n>/…`** reverse-proxies HTTP into a container (same links appear as **proxy URLs** from the API and port links on Machines). **`/explore/<container_id>`** is the read-only filesystem + **Monaco** editor shell for code inside a running lab.
 
-**Three URL families on one port:** operator pages (`/`, `/machines`, …), **`/telvm/api/…`** for tools, and **`/app/…` + `/explore/…`** to see and open workloads — [Architecture](ARCHITECTURE.md). **PubSub, SSE vs LiveView, and what agents see vs the UI:** [Plumbing](docs/plumbing.md).
+**Three URL families on one port:** operator pages (`/`, `/machines`, …), **`/telvm/api/…`** for tools, and **`/app/…` + `/explore/…`** to see and open workloads — [Architecture](docs/ARCHITECTURE.md). **PubSub, SSE vs LiveView, and what agents see vs the UI:** [Plumbing](docs/plumbing.md).
 
 ### Glossary
 
@@ -71,7 +71,7 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](ARCHITECTURE.
 
 ### At a glance (same idea as the banner you can draw in Canva)
 
-One **localhost** port (**4000**). **Preview** uses a **path** on that port, not a separate host port per container: `/app/<container>/port/<n>/…` → companion **reverse-proxies** to `http://<container>:<n>/…` on the Docker bridge (details in [Architecture](ARCHITECTURE.md)).
+One **localhost** port (**4000**). **Preview** uses a **path** on that port, not a separate host port per container: `/app/<container>/port/<n>/…` → companion **reverse-proxies** to `http://<container>:<n>/…` on the Docker bridge (details in [Architecture](docs/ARCHITECTURE.md)).
 
 ```
 +------------------------------------------------------------------+
@@ -93,7 +93,7 @@ One **localhost** port (**4000**). **Preview** uses a **path** on that port, not
 +------------------------------------------------------------------+
 ```
 
-README banner image: [`TELVM_IMAGE_BANNER.png`](TELVM_IMAGE_BANNER.png). For alternate sizes and the GitHub social preview, see [`docs/assets/BANNER.md`](docs/assets/BANNER.md).
+README banner image: [`docs/assets/TELVM_IMAGE_BANNER.png`](docs/assets/TELVM_IMAGE_BANNER.png). For alternate sizes and the GitHub social preview, see [`docs/assets/BANNER.md`](docs/assets/BANNER.md).
 
 | Layer | Role |
 |--------|------|
@@ -121,15 +121,15 @@ README banner image: [`TELVM_IMAGE_BANNER.png`](TELVM_IMAGE_BANNER.png). For alt
 | [docs/agent-api.md](docs/agent-api.md) | **`/telvm/api`** endpoints, SSE events, scope |
 | [docs/plumbing.md](docs/plumbing.md) | PubSub topics, dashboard vs **`/telvm/api/stream`**, Docker pull vs SSE |
 | [docs/assets/ARCHITECTURE-DIAGRAM.md](docs/assets/ARCHITECTURE-DIAGRAM.md) | Mermaid overview, Simple Icons row |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Diagrams, ProxyPlug, **OTP / Finch / unix socket**, Explorer, agent loop, tests |
-| [CHANGELOG.md](CHANGELOG.md) | Version notes; GitHub Releases link |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Diagrams, ProxyPlug, **OTP / Finch / unix socket**, Explorer, agent loop, tests |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Version notes; GitHub Releases link |
 
 ## Community
 
-- [Contributing](CONTRIBUTING.md) (tests, PRs, branch protection, releases)
-- [Architecture](ARCHITECTURE.md)
-- [Security policy](SECURITY.md)
-- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Contributing](docs/CONTRIBUTING.md) (tests, PRs, branch protection, releases)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Security policy](docs/SECURITY.md)
+- [Code of conduct](docs/CODE_OF_CONDUCT.md)
 
 ## License
 

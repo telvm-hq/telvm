@@ -22,7 +22,7 @@ Platform pre-flight on `/` covers Postgres, Docker socket, **Finch → Docker En
 docker compose --profile test run --rm companion_test
 ```
 
-This uses the `test` Compose profile, starts Postgres if needed, sets `MIX_ENV=test` and `TEST_DATABASE_URL` to reach the `db` service. See [Architecture](../ARCHITECTURE.md#test-strategy) for host-only testing and module-level contracts.
+This uses the `test` Compose profile, starts Postgres if needed, sets `MIX_ENV=test` and `TEST_DATABASE_URL` to reach the `db` service. See [Architecture](ARCHITECTURE.md#test-strategy) for host-only testing and module-level contracts.
 
 ### Environment
 
@@ -59,4 +59,4 @@ mix setup
 mix phx.server
 ```
 
-You need Postgres matching `config/dev.exs` (or `DATABASE_URL`). See [Architecture — Test strategy](../ARCHITECTURE.md#test-strategy) for `mix test` on the host.
+You need Postgres matching `config/dev.exs` (or `DATABASE_URL`). See [Architecture — Test strategy](ARCHITECTURE.md#test-strategy) for `mix test` on the host.

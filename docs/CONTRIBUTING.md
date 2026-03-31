@@ -4,13 +4,13 @@ Thanks for helping improve telvm. This document covers how to work on the repo a
 
 ## Principles
 
-- **Private planning** belongs outside the public tree. The repo [`.gitignore`](.gitignore) excludes `.internal/` — do not `git add -f` paths under `.internal/`.
+- **Private planning** belongs outside the public tree. The repo [`.gitignore`](../.gitignore) excludes `.internal/` — do not `git add -f` paths under `.internal/`.
 - Prefer **small, focused PRs** with a clear description of behavior change.
 - Match existing **formatting and naming** in Elixir and HEEx; run the project’s usual checks before pushing.
 
 ## Development setup
 
-- **Docker (recommended):** [docs/quickstart.md](docs/quickstart.md) — `docker compose up --build`, tests via `docker compose --profile test run --rm companion_test`.
+- **Docker (recommended):** [quickstart.md](quickstart.md) — `docker compose up --build`, tests via `docker compose --profile test run --rm companion_test`.
 - **Local Elixir:** from `companion/`, `mix setup` then `mix phx.server` with Postgres as in `config/dev.exs`.
 
 ## Before you open a PR
@@ -20,7 +20,7 @@ Thanks for helping improve telvm. This document covers how to work on the repo a
 
 ## CI and branch protection (maintainers)
 
-After [`.github/workflows/ci.yml`](.github/workflows/ci.yml) has a **green** run on `main`:
+After [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) has a **green** run on `main`:
 
 1. **Settings → Rules → Rulesets** (or **Branches → Branch protection rules**): protect `main`.
 2. Require **pull requests** before merging.
@@ -30,13 +30,13 @@ This keeps `main` aligned with the canonical Docker test command.
 
 ## Social preview image (maintainers)
 
-See [`docs/assets/SOCIAL_PREVIEW.md`](docs/assets/SOCIAL_PREVIEW.md) for **1280×640** GitHub social preview dimensions and where to upload.
+See [`assets/SOCIAL_PREVIEW.md`](assets/SOCIAL_PREVIEW.md) for **1280×640** GitHub social preview dimensions and where to upload.
 
 ## Releases
 
 1. Tag from the commit you intend to ship: `git tag -a v0.1.0 -m "Release notes summary"`.
 2. Push the tag: `git push origin v0.1.0`.
-3. On GitHub: **Releases → Draft a new release**, choose the tag, add notes (high-level changes, upgrade steps if any). Draft text for **v0.1.0** lives in [`docs/releases/v0.1.0.md`](docs/releases/v0.1.0.md) for copy-paste.
+3. On GitHub: **Releases → Draft a new release**, choose the tag, add notes (high-level changes, upgrade steps if any). Draft text for **v0.1.0** lives in [`releases/v0.1.0.md`](releases/v0.1.0.md) for copy-paste.
 
 ## Labels
 
