@@ -180,7 +180,10 @@ defmodule Companion.Docker.HTTP do
 
   defp demux_stdout(data), do: demux_stdout(data, [])
 
-  defp demux_stdout(<<type, _::binary-size(3), size::32-big, payload::binary-size(size), rest::binary>>, acc) do
+  defp demux_stdout(
+         <<type, _::binary-size(3), size::32-big, payload::binary-size(size), rest::binary>>,
+         acc
+       ) do
     if type == 1 do
       demux_stdout(rest, [acc, payload])
     else

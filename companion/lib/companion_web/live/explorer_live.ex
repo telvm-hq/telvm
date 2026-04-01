@@ -37,11 +37,18 @@ defmodule CompanionWeb.ExplorerLive do
       |> assign(:content_path, nil)
       |> assign(:loading, false)
       |> assign(:error, nil)
+      |> assign(:embed?, false)
 
     # Load listing on every mount (including static render) so first paint can populate.
     fetch_entries(container_id, explorer_root)
 
     {:ok, assign(socket, :loading, true)}
+  end
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    embed? = params["embed"] in ["1", "true"]
+    {:noreply, assign(socket, :embed?, embed?)}
   end
 
   # ---------------------------------------------------------------------------
@@ -112,9 +119,16 @@ defmodule CompanionWeb.ExplorerLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="h-screen flex flex-col bg-zinc-950 text-zinc-200 font-mono overflow-hidden">
+    <div class={[
+      "flex flex-col bg-zinc-950 text-zinc-200 font-mono overflow-hidden",
+      @embed? && "h-full min-h-0",
+      !@embed? && "h-screen"
+    ]}>
       <%!-- Header bar --%>
-      <div class="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900/80 shrink-0">
+      <div
+        :if={!@embed?}
+        class="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900/80 shrink-0"
+      >
         <div class="flex items-center gap-3 min-w-0">
           <span class="text-violet-400/90 text-[10px] tracking-wide shrink-0">monaco</span>
           <span class="text-zinc-300 text-[11px] truncate">{@container_name}</span>
@@ -125,16 +139,35 @@ defmodule CompanionWeb.ExplorerLive do
           <span :if={@loading} class="text-zinc-500 text-[10px] animate-pulse">loading…</span>
           <span :if={@error} class="text-rose-400 text-[10px]" title={@error}>error</span>
           <a
-            href="/machines"
+            href="/warm"
             class="px-2 py-0.5 text-[10px] rounded-sm border border-zinc-700 text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors uppercase tracking-wide"
           >
             ← machines
           </a>
         </div>
       </div>
+      <div
+        :if={@embed?}
+        class="flex items-center justify-between px-2 py-1 border-b border-zinc-800 bg-zinc-900/60 shrink-0 gap-2"
+      >
+        <span class="text-violet-400/80 text-[9px] tracking-wide shrink-0">monaco</span>
+        <span class="text-zinc-400 text-[9px] truncate min-w-0">{@container_name}</span>
+        <div class="flex items-center gap-1 shrink-0">
+          <span :if={@loading} class="text-zinc-600 text-[9px] animate-pulse">…</span>
+          <a
+            href={~p"/explore/#{@container_id}"}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="p-1 rounded border border-zinc-700 text-zinc-500 hover:text-violet-300 hover:border-zinc-500 transition-colors"
+            title="Open in new tab"
+          >
+            <.icon name="hero-arrow-top-right-on-square" class="size-3.5" />
+          </a>
+        </div>
+      </div>
 
       <%!-- Two-panel body --%>
-      <div class="flex flex-1 min-h-0">
+      <div class="flex flex-1 min-h-0 min-w-0">
         <%!-- File tree panel --%>
         <div class="w-60 shrink-0 border-r border-zinc-800 overflow-y-auto bg-black/20 py-1">
           <%!-- Parent directory link --%>
@@ -168,8 +201,8 @@ defmodule CompanionWeb.ExplorerLive do
               phx-value-path={join_path(@path, entry.name)}
               class={[
                 "flex items-center gap-2 w-full px-3 py-1 text-[10px] transition-colors hover:bg-zinc-800/50 text-left",
-                @content_path == join_path(@path, entry.name) &&
-                  "text-amber-300 bg-zinc-800/40" ||
+                (@content_path == join_path(@path, entry.name) &&
+                   "text-amber-300 bg-zinc-800/40") ||
                   "text-zinc-400 hover:text-zinc-200"
               ]}
             >

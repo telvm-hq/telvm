@@ -34,39 +34,39 @@ defmodule Companion.LabCatalogTest do
   end
 
   describe "get/1" do
-    test "returns the stock_node entry" do
-      entry = LabCatalog.get(:stock_node)
-      assert entry.id == :stock_node
-      assert entry.ref == "node:22-alpine"
+    test "returns the lab_bun entry" do
+      entry = LabCatalog.get(:lab_bun)
+      assert entry.id == :lab_bun
+      assert entry.ref == "oven/bun:1-alpine"
       assert entry.use_image_cmd == false
       assert is_list(entry.container_cmd)
     end
 
-    test "returns the go_http_lab entry" do
-      entry = LabCatalog.get(:go_http_lab)
-      assert entry.id == :go_http_lab
-      assert entry.use_image_cmd == true
-      assert entry.build_context != nil
-      assert is_nil(entry.container_cmd)
-    end
-
-    test "returns the python_http entry" do
-      entry = LabCatalog.get(:python_http)
-      assert entry.id == :python_http
-      assert entry.ref == "python:3.12-alpine"
+    test "returns the lab_go entry" do
+      entry = LabCatalog.get(:lab_go)
+      assert entry.id == :lab_go
+      assert entry.ref == "golang:1.23-alpine"
+      assert entry.use_image_cmd == false
       assert is_list(entry.container_cmd)
     end
 
-    test "returns the ruby_http entry" do
-      entry = LabCatalog.get(:ruby_http)
-      assert entry.id == :ruby_http
-      assert entry.ref == "ruby:3.3-alpine"
+    test "returns the lab_python_uv entry" do
+      entry = LabCatalog.get(:lab_python_uv)
+      assert entry.id == :lab_python_uv
+      assert entry.ref == "python:3.12-slim-bookworm"
+      assert is_list(entry.container_cmd)
     end
 
-    test "returns the busybox_http entry" do
-      entry = LabCatalog.get(:busybox_http)
-      assert entry.id == :busybox_http
-      assert entry.ref == "busybox:latest"
+    test "returns the lab_elixir entry" do
+      entry = LabCatalog.get(:lab_elixir)
+      assert entry.id == :lab_elixir
+      assert entry.ref == "elixir:1.18-alpine"
+    end
+
+    test "returns the lab_c entry" do
+      entry = LabCatalog.get(:lab_c)
+      assert entry.id == :lab_c
+      assert entry.ref == "gcc:14-bookworm"
     end
 
     test "returns nil for unknown id" do

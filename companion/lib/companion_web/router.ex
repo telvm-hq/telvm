@@ -17,10 +17,14 @@ defmodule CompanionWeb.Router do
   scope "/", CompanionWeb do
     pipe_through :browser
 
+    get "/", RedirectController, :to_health
+    get "/topology", RedirectController, :to_health
+    get "/telvm/api/fyi", FyiController, :show
+
     live_session :default,
       layout: {CompanionWeb.Layouts, :app} do
-      live "/", StatusLive, :checks
-      live "/topology", StatusLive, :topology
+      live "/health", StatusLive, :preflight
+      live "/warm", StatusLive, :warm_assets
       live "/machines", StatusLive, :machines
       live "/images", StatusLive, :legacy_images_redirect
       live "/vm-manager-preflight", StatusLive, :legacy_preflight_redirect
@@ -37,12 +41,12 @@ defmodule CompanionWeb.Router do
   scope "/telvm/api", CompanionWeb do
     pipe_through :api
 
-    get    "/machines",          MachineController, :index
-    get    "/machines/:id",      MachineController, :show
-    post   "/machines",          MachineController, :create
-    post   "/machines/:id/exec", MachineController, :exec
-    delete "/machines/:id",      MachineController, :delete
-    get    "/stream",            MachineController, :stream
+    get "/machines", MachineController, :index
+    get "/machines/:id", MachineController, :show
+    post "/machines", MachineController, :create
+    post "/machines/:id/exec", MachineController, :exec
+    delete "/machines/:id", MachineController, :delete
+    get "/stream", MachineController, :stream
   end
 
   # Enable LiveDashboard in development

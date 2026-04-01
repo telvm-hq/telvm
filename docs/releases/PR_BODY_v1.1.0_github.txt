@@ -1,0 +1,22 @@
+## Summary
+
+Document **v1.1.0** UI and dashboard changes and align the README with current LiveView routes and lab catalog behavior.
+
+## UI / operator experience
+
+- **Tabs / nav:** Pre-flight (`/health`), Warm assets (`/warm`), and Machines (`/machines`) share a consistent console shell layout and top navigation.
+- **Warm assets:** Dedicated tab for the warm-machine / asset-oriented view; verify and soak patterns stay coherent with the rest of the operator console.
+- **Mission console / Monaco:** Preview column remains visible with a stable preview frame height for a dependable two-column layout.
+- **Theming:** Shell supports **light** and **dark** modes and **accent** choices (for example purple, yellow, green) where wired in LiveView and CSS.
+- **Lab catalog:** Five stock **Docker Hub** images as quick picks, labeled **Node + Bun**, **Go**, **Elixir + mix**, **python + uv**, and **C + gcc**, with **Heroicons** only (no separate catalog logo assets). Default catalog selection remains the Bun-oriented entry (`lab_bun`).
+
+## Docs / release
+
+- New `docs/releases/v1.1.0.md` (GitHub Release draft body).
+- `docs/CHANGELOG.md` **`## [1.1.0]`** section with link to that file.
+- `README.md` operator UI section updated for `/health`, `/warm`, `/machines` and the lab catalog copy.
+
+## Testing
+
+- `mix format` and `mix compile --warnings-as-errors` under `companion/`.
+- Full `mix test` with Postgres available, or `docker compose --profile test run --rm companion_test` per `docs/quickstart.md`.

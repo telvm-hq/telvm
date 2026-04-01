@@ -36,7 +36,7 @@ See [`assets/SOCIAL_PREVIEW.md`](assets/SOCIAL_PREVIEW.md) for **1280×640** Git
 
 1. Tag from the commit you intend to ship: `git tag -a v0.1.0 -m "Release notes summary"`.
 2. Push the tag: `git push origin v0.1.0`.
-3. On GitHub: **Releases → Draft a new release**, choose the tag, add notes (high-level changes, upgrade steps if any). Draft text for **v0.1.0** lives in [`releases/v0.1.0.md`](releases/v0.1.0.md) for copy-paste.
+3. On GitHub: **Releases → Draft a new release**, choose the tag, add notes (high-level changes, upgrade steps if any). Draft text examples: [`releases/v0.1.0.md`](releases/v0.1.0.md), [`releases/v1.1.0.md`](releases/v1.1.0.md). For a docs-only PR that ships these notes, see [`releases/PR_BODY_v1.1.0.md`](releases/PR_BODY_v1.1.0.md).
 
 ## Labels
 

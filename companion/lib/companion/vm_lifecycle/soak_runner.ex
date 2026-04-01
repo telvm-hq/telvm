@@ -73,7 +73,9 @@ defmodule Companion.VmLifecycle.SoakRunner do
             url = "http://#{host}:#{port}#{path}"
             bind_deadline = System.monotonic_time(:millisecond) + bind_ms
 
-            narrate("Bind wait: probing #{url} (up to #{div(bind_ms, 1000)}s) until first HTTP 200…")
+            narrate(
+              "Bind wait: probing #{url} (up to #{div(bind_ms, 1000)}s) until first HTTP 200…"
+            )
 
             case wait_first_200(url, bind_deadline) do
               :ok ->
