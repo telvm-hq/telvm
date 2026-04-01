@@ -320,7 +320,10 @@ defmodule CompanionWeb.MachineController do
 
   defp build_machine_from_inspect(_docker, info) do
     id = info["Id"]
-    name = info["Name"] |> then(fn n -> if is_binary(n), do: String.trim_leading(n, "/"), else: "" end)
+
+    name =
+      info["Name"] |> then(fn n -> if is_binary(n), do: String.trim_leading(n, "/"), else: "" end)
+
     image = get_in(info, ["Config", "Image"]) || ""
     status = get_in(info, ["State", "Status"]) || "unknown"
     created = info["Created"]
@@ -352,12 +355,14 @@ defmodule CompanionWeb.MachineController do
   defp extract_name(_), do: ""
 
   defp format_created(nil), do: nil
+
   defp format_created(unix) when is_integer(unix) do
     case DateTime.from_unix(unix) do
       {:ok, dt} -> DateTime.to_iso8601(dt)
       _ -> nil
     end
   end
+
   defp format_created(str) when is_binary(str), do: str
 
   defp build_proxy_urls(name, ports) do

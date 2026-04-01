@@ -118,12 +118,15 @@ defmodule Companion.VmLifecycle do
 
   defp env_truthy?(var) do
     case System.get_env(var) do
-      nil -> false
-      "" -> false
+      nil ->
+        false
+
+      "" ->
+        false
+
       v ->
         v = v |> String.trim() |> String.downcase()
         v in ["1", "true", "yes"]
     end
   end
 end
-

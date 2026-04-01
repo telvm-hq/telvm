@@ -4,6 +4,19 @@ All notable changes to this project are documented here and in [GitHub Releases]
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) where it applies to tagged releases.
 
+## [1.1.0] — 2026-03-31
+
+Major companion **operator UI** refresh. Full narrative for maintainers and GitHub Releases: [`releases/v1.1.0.md`](releases/v1.1.0.md).
+
+### Operator UI (dashboard)
+
+- **Navigation:** Distinct **Pre-flight** (`/health`), **Warm assets** (`/warm`), and **Machines** (`/machines`) with a shared console shell layout and consistent top nav.
+- **Mission / lab layout:** Stable **preview** column and fixed preview frame height; tighter headers; shared max content width across tabs (`telvm-console-shell`).
+- **Theming:** **Light** and **dark** shell modes and selectable **accent** colors (for operational contrast and branding).
+- **Lab catalog:** Five **Docker Hub** stock labs with **text + Heroicon** chips—**Node + Bun**, **Go**, **Elixir + mix**, **python + uv**, **C + gcc**; catalog logo image assets removed in favor of labels only.
+
+No breaking changes to the **Machine API** (`/telvm/api`) in this release; see [`agent-api.md`](agent-api.md) for the HTTP surface.
+
 ## [0.1.0] — 2026-03-29
 
 Initial public OSS snapshot. Summary: [`releases/v0.1.0.md`](releases/v0.1.0.md). HTTP automation surface: [`agent-api.md`](agent-api.md).
@@ -16,4 +29,5 @@ Initial public OSS snapshot. Summary: [`releases/v0.1.0.md`](releases/v0.1.0.md)
 
 Docs: [Architecture — OTP, Finch, Docker socket](ARCHITECTURE.md#otp-finch-and-the-docker-unix-socket), [Why Elixir / OTP](ARCHITECTURE.md#why-elixir--otp), [Plumbing](plumbing.md).
 
+[1.1.0]: https://github.com/telvm-hq/telvm/releases/tag/v1.1.0
 [0.1.0]: https://github.com/telvm-hq/telvm/releases/tag/v0.1.0

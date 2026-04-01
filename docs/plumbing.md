@@ -8,7 +8,7 @@ Everything listens on **`http://localhost:4000`**:
 
 | Audience | Surfaces |
 |----------|----------|
-| **Browser** | LiveView **checks** (`/`), **Machines** (`/machines`), **topology** (`/topology`); **[Preview](../companion/lib/companion_web/proxy_plug.ex)** at **`/app/<container>/port/<n>/…`**; **Explorer** at **`/explore/:id`**. |
+| **Browser** | LiveView **Pre-flight** (`/health`), **Machines** (`/machines`); **[Preview](../companion/lib/companion_web/proxy_plug.ex)** at **`/app/<container>/port/<n>/…`**; **Explorer** at **`/explore/:id`**; FYI markdown at **`/telvm/api/fyi`**. |
 | **Agents / scripts** | JSON and **SSE** under **`/telvm/api`** — [Machine API (agents)](agent-api.md). |
 
 LiveView pages use Phoenix’s **WebSocket** channel for the UI. The **Machine API** stream is plain **HTTP SSE** (`GET /telvm/api/stream`).

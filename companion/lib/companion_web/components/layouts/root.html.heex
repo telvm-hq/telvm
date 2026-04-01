@@ -25,12 +25,23 @@
           setTheme(localStorage.getItem("phx:theme") || "system");
         }
         window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
-        
+
         window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+
+        const setAccent = (accent) => {
+          const v = ["purple", "yellow", "green"].includes(accent) ? accent : "purple";
+          localStorage.setItem("phx:accent", v);
+          document.documentElement.setAttribute("data-accent", v);
+        };
+        if (!document.documentElement.hasAttribute("data-accent")) {
+          setAccent(localStorage.getItem("phx:accent") || "purple");
+        }
+        window.addEventListener("storage", (e) => e.key === "phx:accent" && setAccent(e.newValue || "purple"));
+        window.addEventListener("phx:set-accent", (e) => setAccent(e.target.dataset.phxAccent));
       })();
     </script>
   </head>
-  <body>
+  <body class="min-h-screen antialiased">
     {@inner_content}
   </body>
 </html>
