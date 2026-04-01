@@ -31,7 +31,8 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ "warm-machines-section"
     assert html =~ "warm assets"
     assert html =~ "No warm machines"
-    assert html =~ "endpoints"
+    # "endpoints" appears only when at least one warm machine row exists
+    assert html =~ "telvm · warm assets"
     assert html =~ "lab-preview-frame"
     assert html =~ "No preview yet"
     assert html =~ ~s(href="/warm")
