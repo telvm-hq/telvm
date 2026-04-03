@@ -38,6 +38,11 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:explorer_preview_id, nil)
       |> assign(:preview_iframe_src, nil)
       |> assign(:preview_mode, nil)
+      |> assign(:warm_preview_panel, :iframe)
+      |> assign(:warm_logs_text, nil)
+      |> assign(:warm_logs_container_id, nil)
+      |> assign(:warm_logs_loading, false)
+      |> assign(:warm_logs_error, nil)
       |> assign(:lab_verify_tab, "status")
       |> assign(:verify_last_error, nil)
       |> assign(:verify_chain_active, false)
@@ -364,6 +369,8 @@ defmodule CompanionWeb.StatusLive do
   def handle_event("set_explorer_preview", %{"id" => id}, socket) do
     cur = socket.assigns[:explorer_preview_id]
 
+    socket = clear_warm_logs_preview(socket)
+
     {next_id, src, mode} =
       if cur == id do
         {nil, nil, nil}
@@ -429,9 +436,72 @@ defmodule CompanionWeb.StatusLive do
   def handle_event("preview_port", %{"path" => path}, socket) when is_binary(path) do
     {:noreply,
      socket
+     |> clear_warm_logs_preview()
      |> assign(:preview_iframe_src, path)
      |> assign(:preview_mode, :http)
      |> assign(:explorer_preview_id, nil)}
+  end
+
+  @impl true
+  def handle_event("show_warm_logs", %{"id" => id}, socket) when is_binary(id) do
+    docker = Companion.Docker.impl()
+    tail = 500
+
+    socket =
+      socket
+      |> assign(:warm_preview_panel, :logs)
+      |> assign(:warm_logs_container_id, id)
+      |> assign(:warm_logs_loading, true)
+      |> assign(:warm_logs_error, nil)
+      |> assign(:warm_logs_text, nil)
+      |> assign(:preview_iframe_src, nil)
+      |> assign(:preview_mode, nil)
+      |> assign(:explorer_preview_id, nil)
+
+    case docker.container_logs(id, tail: tail) do
+      {:ok, text} ->
+        {:noreply,
+         socket
+         |> assign(:warm_logs_loading, false)
+         |> assign(:warm_logs_text, warm_logs_with_preamble(id, text, :initial))}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:warm_logs_loading, false)
+         |> assign(:warm_logs_error, inspect(reason))}
+    end
+  end
+
+  @impl true
+  def handle_event("refresh_warm_logs", _params, socket) do
+    id = socket.assigns[:warm_logs_container_id]
+    tail = 500
+
+    if is_nil(id) do
+      {:noreply, socket}
+    else
+      docker = Companion.Docker.impl()
+
+      socket =
+        socket
+        |> assign(:warm_logs_loading, true)
+        |> assign(:warm_logs_error, nil)
+
+      case docker.container_logs(id, tail: tail) do
+        {:ok, text} ->
+          {:noreply,
+           socket
+           |> assign(:warm_logs_loading, false)
+           |> assign(:warm_logs_text, warm_logs_with_preamble(id, text, :refresh))}
+
+        {:error, reason} ->
+          {:noreply,
+           socket
+           |> assign(:warm_logs_loading, false)
+           |> assign(:warm_logs_error, inspect(reason))}
+      end
+    end
   end
 
   # --- Events: destroy all lab containers ---
@@ -471,10 +541,10 @@ defmodule CompanionWeb.StatusLive do
     end
   end
 
-  # --- Events: stop individual machine ---
+  # --- Events: destroy individual machine (stop + remove) ---
 
   @impl true
-  def handle_event("stop_machine", %{"id" => cid}, socket) do
+  def handle_event("destroy_machine", %{"id" => cid}, socket) do
     docker = Companion.Docker.impl()
 
     Task.start(fn ->
@@ -500,10 +570,70 @@ defmodule CompanionWeb.StatusLive do
           do: assign(s, :preflight_session, nil),
           else: s
       end)
-      |> put_flash(:info, "Stopping container #{String.slice(cid, 0, 12)}…")
+      |> put_flash(:info, "Destroying container #{String.slice(cid, 0, 12)}…")
       |> assign(:warm_machines, fetch_warm_machines())
+      |> maybe_followup_warm_refresh()
 
     {:noreply, socket}
+  end
+
+  # --- Events: restart / pause / resume (Engine API via Docker adapter) ---
+
+  @impl true
+  def handle_event("restart_machine", %{"id" => cid}, socket) do
+    docker = Companion.Docker.impl()
+
+    case docker.container_restart(cid, timeout_sec: 10) do
+      :ok ->
+        socket =
+          socket
+          |> put_flash(:info, "Restarting container #{String.slice(cid, 0, 12)}…")
+          |> assign(:warm_machines, fetch_warm_machines())
+          |> maybe_followup_warm_refresh()
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Restart failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("pause_machine", %{"id" => cid}, socket) do
+    docker = Companion.Docker.impl()
+
+    case docker.container_pause(cid) do
+      :ok ->
+        socket =
+          socket
+          |> put_flash(:info, "Pausing container #{String.slice(cid, 0, 12)}…")
+          |> assign(:warm_machines, fetch_warm_machines())
+          |> maybe_followup_warm_refresh()
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Pause failed: #{inspect(reason)}")}
+    end
+  end
+
+  @impl true
+  def handle_event("unpause_machine", %{"id" => cid}, socket) do
+    docker = Companion.Docker.impl()
+
+    case docker.container_unpause(cid) do
+      :ok ->
+        socket =
+          socket
+          |> put_flash(:info, "Resuming container #{String.slice(cid, 0, 12)}…")
+          |> assign(:warm_machines, fetch_warm_machines())
+          |> maybe_followup_warm_refresh()
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Resume failed: #{inspect(reason)}")}
+    end
   end
 
   defp start_vm_manager_preflight(socket, opts) do
@@ -623,11 +753,11 @@ defmodule CompanionWeb.StatusLive do
     ~H"""
     <div class="telvm-terminal telvm-console-shell px-3 py-3 sm:px-4 sm:py-4">
       <.terminal_nav active={@live_action} />
-
       <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 telvm-accent-border-b border-b pb-2 mb-2">
         <div class="text-[11px] sm:text-xs uppercase tracking-[0.2em] telvm-accent-text font-semibold shrink-0">
           telvm · warm assets
         </div>
+
         <p
           class="text-[9px] sm:text-[10px] font-mono leading-snug max-w-md lg:max-w-xl lg:text-right"
           style="color: var(--telvm-shell-muted);"
@@ -643,6 +773,7 @@ defmodule CompanionWeb.StatusLive do
             scroll_class="max-h-[min(52vh,22rem)] lg:max-h-[min(82vh,44rem)] overflow-y-auto pr-1"
           />
         </div>
+
         <div class="lg:col-span-7 min-w-0 order-2 flex flex-col">
           <.warm_preview_panel {assigns} />
         </div>
@@ -662,6 +793,7 @@ defmodule CompanionWeb.StatusLive do
       <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.15em] mb-3 font-semibold">
         warm assets
       </div>
+
       <div
         :if={@warm_machines == []}
         class="text-[11px] font-mono italic"
@@ -669,6 +801,7 @@ defmodule CompanionWeb.StatusLive do
       >
         No warm machines — run verify or extended soak on Machines, or leave a lab container up.
       </div>
+
       <div :if={@warm_machines != []} class={["space-y-3", @scroll_class]}>
         <div
           :for={m <- @warm_machines}
@@ -687,6 +820,7 @@ defmodule CompanionWeb.StatusLive do
               >
                 {m.name}
               </div>
+
               <div
                 class="text-[10px] truncate font-mono mt-0.5"
                 style="color: var(--telvm-shell-muted);"
@@ -695,6 +829,7 @@ defmodule CompanionWeb.StatusLive do
                 {m.image}
               </div>
             </div>
+
             <div class="flex items-center gap-2 shrink-0">
               <span class={live_activity_class(m, @soak_session, @preflight_session)}>
                 {live_activity_txt(m, @soak_session, @preflight_session)}
@@ -708,16 +843,60 @@ defmodule CompanionWeb.StatusLive do
               <span class={["font-medium text-[10px]", warm_status_class(m.status)]}>
                 {String.slice(m.status, 0, 4)}
               </span>
-              <button
-                type="button"
-                phx-click="stop_machine"
-                phx-value-id={m.id}
-                class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-btn-danger"
-              >
-                stop
-              </button>
+              <div :if={warm_machine_running?(m)} class="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  phx-click="restart_machine"
+                  phx-value-id={m.id}
+                  phx-disable-with="restarting…"
+                  class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-btn-secondary"
+                >
+                  restart
+                </button>
+                <button
+                  type="button"
+                  phx-click="pause_machine"
+                  phx-value-id={m.id}
+                  phx-disable-with="pausing…"
+                  class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-btn-warn"
+                >
+                  pause
+                </button>
+              </div>
+              <div :if={warm_machine_paused?(m)} class="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  phx-click="unpause_machine"
+                  phx-value-id={m.id}
+                  phx-disable-with="resuming…"
+                  class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-btn-secondary"
+                >
+                  resume
+                </button>
+                <button
+                  type="button"
+                  phx-click="destroy_machine"
+                  phx-value-id={m.id}
+                  phx-disable-with="destroying…"
+                  class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-btn-danger"
+                >
+                  destroy
+                </button>
+              </div>
+              <div :if={warm_machine_destroy_only?(m)} class="flex flex-wrap items-center gap-1">
+                <button
+                  type="button"
+                  phx-click="destroy_machine"
+                  phx-value-id={m.id}
+                  phx-disable-with="destroying…"
+                  class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-btn-danger"
+                >
+                  destroy
+                </button>
+              </div>
             </div>
           </div>
+
           <div
             class="border-t pt-2 mt-1"
             style="border-color: color-mix(in oklch, var(--telvm-shell-border) 85%, transparent);"
@@ -725,6 +904,7 @@ defmodule CompanionWeb.StatusLive do
             <div class="telvm-accent-text text-[10px] uppercase tracking-[0.12em] font-semibold mb-2">
               endpoints
             </div>
+
             <div class="flex flex-wrap items-center gap-2">
               <span
                 :if={m.ports == [] and m.internal_ports == []}
@@ -758,6 +938,20 @@ defmodule CompanionWeb.StatusLive do
               </span>
               <button
                 type="button"
+                phx-click="show_warm_logs"
+                phx-value-id={m.id}
+                class={[
+                  "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-mono transition-colors",
+                  logs_preview_active?(@warm_preview_panel, @warm_logs_container_id, m.id) &&
+                    "telvm-files-btn-on",
+                  !logs_preview_active?(@warm_preview_panel, @warm_logs_container_id, m.id) &&
+                    "telvm-files-btn-off"
+                ]}
+              >
+                <.icon name="hero-command-line" class="size-3.5" /> logs
+              </button>
+              <button
+                type="button"
                 phx-click="set_explorer_preview"
                 phx-value-id={m.id}
                 class={[
@@ -779,35 +973,73 @@ defmodule CompanionWeb.StatusLive do
   defp warm_preview_panel(assigns) do
     ~H"""
     <div class="flex flex-col flex-1 min-h-0 h-full" id="lab-preview-frame">
-      <div
-        class="text-[10px] uppercase tracking-wide mb-1 font-semibold"
-        style="color: var(--telvm-shell-muted);"
-      >
-        preview
+      <div :if={@warm_preview_panel == :logs} class="flex flex-col flex-1 min-h-0 gap-2">
+        <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div
+            class="text-[10px] uppercase tracking-wide font-semibold"
+            style="color: var(--telvm-shell-muted);"
+          >
+            logs
+          </div>
+          <button
+            type="button"
+            phx-click="refresh_warm_logs"
+            class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-btn-secondary"
+            phx-disable-with="refreshing…"
+          >
+            refresh
+          </button>
+        </div>
+        <pre
+          class="telvm-warm-preview-frame w-full flex-1 min-h-[12rem] max-h-[min(82vh,44rem)] overflow-auto rounded border bg-black/50 p-3 whitespace-pre-wrap font-mono text-[11px] leading-relaxed"
+          style="border-color: var(--telvm-shell-border); color: var(--telvm-shell-fg);"
+        ><code
+            :if={@warm_logs_loading}
+            class="block"
+            style="color: var(--telvm-shell-muted);"
+          >Loading…</code><code :if={!@warm_logs_loading && @warm_logs_error} class="block text-red-400/90">{@warm_logs_error}</code><code
+            :if={!@warm_logs_loading && !@warm_logs_error}
+            class="block whitespace-pre-wrap"
+          >{@warm_logs_text || ""}</code></pre>
       </div>
-      <iframe
-        :if={@preview_iframe_src != nil}
-        src={@preview_iframe_src}
-        class="telvm-warm-preview-frame w-full shrink-0 rounded border bg-black/50"
-        style="border-color: var(--telvm-shell-border);"
-        title="Lab preview"
-      />
-      <div
-        :if={@preview_iframe_src == nil}
-        class="telvm-warm-preview-frame w-full shrink-0 rounded border flex flex-col items-center justify-center text-center px-4 py-6 bg-black/25 overflow-hidden"
-        style="border-color: color-mix(in oklch, var(--telvm-shell-border) 75%, transparent); border-style: dashed;"
-      >
-        <p class="telvm-accent-text text-xs font-semibold mb-2">No preview yet</p>
-        <p class="text-[11px] max-w-sm leading-relaxed mb-3" style="color: var(--telvm-shell-muted);">
-          Choose a published port (for example
-          <span class="telvm-accent-dim-text font-mono">:3333</span>
-          on the default Node image) or open
-          <span class="telvm-accent-dim-text font-mono">files</span>
-          for the Monaco editor.
-        </p>
-        <p class="text-[10px] font-mono opacity-70" style="color: var(--telvm-shell-muted);">
-          The frame stays here so layout matches when a preview is active.
-        </p>
+
+      <div :if={@warm_preview_panel != :logs} class="flex flex-col flex-1 min-h-0">
+        <div
+          class="text-[10px] uppercase tracking-wide mb-1 font-semibold"
+          style="color: var(--telvm-shell-muted);"
+        >
+          preview
+        </div>
+
+        <iframe
+          :if={@preview_iframe_src != nil}
+          src={@preview_iframe_src}
+          class="telvm-warm-preview-frame w-full shrink-0 rounded border bg-black/50"
+          style="border-color: var(--telvm-shell-border);"
+          title="Lab preview"
+        />
+        <div
+          :if={@preview_iframe_src == nil}
+          class="telvm-warm-preview-frame w-full shrink-0 rounded border flex flex-col items-center justify-center text-center px-4 py-6 bg-black/25 overflow-hidden"
+          style="border-color: color-mix(in oklch, var(--telvm-shell-border) 75%, transparent); border-style: dashed;"
+        >
+          <p class="telvm-accent-text text-xs font-semibold mb-2">No preview yet</p>
+
+          <p
+            class="text-[11px] max-w-sm leading-relaxed mb-3"
+            style="color: var(--telvm-shell-muted);"
+          >
+            Choose a published port (for example
+            <span class="telvm-accent-dim-text font-mono">:3333</span>
+            on the default Node image), open <span class="telvm-accent-dim-text font-mono">logs</span>
+            for stdout/stderr, or <span class="telvm-accent-dim-text font-mono">files</span>
+            for the Monaco editor.
+          </p>
+
+          <p class="text-[10px] font-mono opacity-70" style="color: var(--telvm-shell-muted);">
+            The frame stays here so layout matches when a preview is active.
+          </p>
+        </div>
       </div>
     </div>
     """
@@ -819,7 +1051,6 @@ defmodule CompanionWeb.StatusLive do
     ~H"""
     <div class="telvm-terminal telvm-console-shell px-3 py-3 sm:px-4 sm:py-4">
       <.terminal_nav active={@live_action} />
-
       <div class="flex flex-wrap items-end justify-between gap-2 telvm-accent-border-b border-b pb-2 mb-4">
         <div class="text-[11px] sm:text-xs uppercase tracking-[0.2em] telvm-accent-text font-semibold">
           telvm · mission console
@@ -832,7 +1063,6 @@ defmodule CompanionWeb.StatusLive do
       >
         Ephemeral pre-flight or persistent soak → warm asset. Engine via Finch → docker.sock.
       </p>
-
       <%!-- Image & runtime (top) --%>
       <section
         class="mb-5 rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4"
@@ -841,6 +1071,7 @@ defmodule CompanionWeb.StatusLive do
         <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] mb-3 font-semibold">
           image &amp; runtime
         </div>
+
         <div
           class="grid gap-2 mb-4 justify-start [grid-template-columns:repeat(auto-fill,100px)]"
           id="lab-catalog-grid"
@@ -864,8 +1095,7 @@ defmodule CompanionWeb.StatusLive do
                 <.icon
                   name={entry.icon}
                   class="size-3.5 sm:size-4 shrink-0 opacity-90"
-                />
-                <span class="truncate leading-tight">{entry.label}</span>
+                /> <span class="truncate leading-tight">{entry.label}</span>
               </span>
             </button>
             <button
@@ -881,12 +1111,14 @@ defmodule CompanionWeb.StatusLive do
             </button>
           </div>
         </div>
+
         <p
           :if={@image_pull_busy}
           class="telvm-accent-text text-[10px] font-mono mb-3 animate-pulse opacity-90"
         >
           Pulling image…
         </p>
+
         <div class="max-w-2xl">
           <label
             for="byoi-image-ref"
@@ -912,7 +1144,6 @@ defmodule CompanionWeb.StatusLive do
           </p>
         </div>
       </section>
-
       <%!-- Lab verification card --%>
       <section
         class="mb-5 rounded-sm telvm-panel-border border telvm-panel-bg telvm-verify-card p-3 sm:p-4"
@@ -922,6 +1153,7 @@ defmodule CompanionWeb.StatusLive do
           <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.15em] font-semibold">
             lab verification
           </div>
+
           <div
             class="flex rounded overflow-hidden text-[10px]"
             style="border: 1px solid var(--telvm-shell-border);"
@@ -966,12 +1198,14 @@ defmodule CompanionWeb.StatusLive do
                 <span class="relative inline-flex h-9 w-9 rounded-full border-2 telvm-ping-inner">
                 </span>
               </div>
+
               <div
                 :if={@lab_verify_pass and not @vm_preflight_busy and not @soak_busy}
                 class="flex h-12 w-12 items-center justify-center rounded-full border-2 telvm-pass-ring"
               >
                 <.icon name="hero-check-circle" class="size-7 telvm-text-ok" />
               </div>
+
               <div
                 :if={
                   not @lab_verify_pass and not @vm_preflight_busy and not @soak_busy and
@@ -987,6 +1221,7 @@ defmodule CompanionWeb.StatusLive do
                   idle
                 </span>
               </div>
+
               <div class="text-[11px] max-w-md" style="color: var(--telvm-shell-muted);">
                 <span :if={@vm_preflight_busy} class="telvm-accent-text">Pre-flight running…</span>
                 <span :if={@soak_busy and not @vm_preflight_busy} class="telvm-accent-dim-text">
@@ -1009,6 +1244,7 @@ defmodule CompanionWeb.StatusLive do
                 </span>
               </div>
             </div>
+
             <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
               <button
                 type="button"
@@ -1073,7 +1309,6 @@ defmodule CompanionWeb.StatusLive do
           >{@verify_last_error}</pre>
         </div>
       </section>
-
       <%!-- Build log (Go HTTP lab local build) --%>
       <div :if={@image_build_log != [] or @image_build_busy} class="mt-4">
         <div
@@ -1082,6 +1317,7 @@ defmodule CompanionWeb.StatusLive do
         >
           build
         </div>
+
         <div
           id="image-build-log"
           phx-hook="ScrollBottom"
@@ -1089,9 +1325,7 @@ defmodule CompanionWeb.StatusLive do
           style="border: 1px solid var(--telvm-shell-border); background: var(--telvm-input-bg);"
         >
           <div :for={{ts, text} <- @image_build_log} style="color: var(--telvm-shell-muted);">
-            <span class="tabular-nums mr-2 opacity-70">
-              {Calendar.strftime(ts, "%H:%M:%S UTC")}
-            </span>
+            <span class="tabular-nums mr-2 opacity-70">{Calendar.strftime(ts, "%H:%M:%S UTC")}</span>
             <span>{text}</span>
           </div>
         </div>
@@ -1106,7 +1340,6 @@ defmodule CompanionWeb.StatusLive do
     ~H"""
     <div class="telvm-terminal telvm-console-shell px-3 py-3 sm:px-4 sm:py-4">
       <.terminal_nav active={@live_action} />
-
       <div class="telvm-accent-border-b border-b pb-2 mb-3 text-[11px] sm:text-xs uppercase tracking-widest telvm-accent-text">
         telvm · OSS
       </div>
@@ -1115,11 +1348,13 @@ defmodule CompanionWeb.StatusLive do
         <div class="min-w-0 space-y-5">
           <div id="preflight-rollup" data-rollup={to_string(@report.rollup)} class="mb-4 space-y-1">
             <div class="font-semibold" style="color: var(--telvm-shell-fg);">pre-flight</div>
+
             <p class="text-xs leading-relaxed max-w-xl" style="color: var(--telvm-shell-muted);">
               after <span class="telvm-accent-dim-text">docker compose up</span>
               · PubSub <span class="telvm-accent-dim-text">preflight:updates</span>
               · <span class="telvm-accent-dim-text">Companion.PreflightServer</span>
             </p>
+
             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs sm:text-sm mt-2">
               <span style="color: var(--telvm-shell-muted);">status</span>
               <span class={rollup_class(@report.rollup)}>{rollup_label(@report.rollup)}</span>
@@ -1137,9 +1372,11 @@ defmodule CompanionWeb.StatusLive do
             >
               gating
             </div>
+
             <p class="text-xs mb-2" style="color: var(--telvm-shell-muted);">
               Rollup = all pass → ready; any fail → blocked; else degraded (warn/skip).
             </p>
+
             <div class="overflow-x-auto telvm-panel-border border" id="preflight-gating-table">
               <.term_header cols={["check", "st", "detail"]} />
               <div :for={c <- gating_checks(@report)} id={"preflight-row-#{c.id}"} class="term-row">
@@ -1150,7 +1387,9 @@ defmodule CompanionWeb.StatusLive do
                 >
                   {c.title}
                 </div>
+
                 <div class="col-span-2 sm:col-span-2"><.term_status status={c.status} /></div>
+
                 <div
                   class="col-span-12 sm:col-span-5 break-words"
                   style="color: var(--telvm-shell-muted);"
@@ -1168,13 +1407,16 @@ defmodule CompanionWeb.StatusLive do
             >
               informational
             </div>
+
             <div class="overflow-x-auto telvm-panel-border border" id="preflight-info-table">
               <.term_header cols={["item", "st", "detail"]} />
               <div :for={c <- info_checks(@report)} class="term-row">
                 <div class="col-span-5 truncate" style="color: var(--telvm-shell-fg);" title={c.title}>
                   {c.title}
                 </div>
+
                 <div class="col-span-2"><.term_status status={c.status} /></div>
+
                 <div
                   class="col-span-12 sm:col-span-5 break-words"
                   style="color: var(--telvm-shell-muted);"
@@ -1192,6 +1434,7 @@ defmodule CompanionWeb.StatusLive do
             >
               compose
             </div>
+
             <ul class="space-y-2 text-xs">
               <li
                 :for={row <- StackStatus.compose_stack_rows()}
@@ -1213,10 +1456,14 @@ defmodule CompanionWeb.StatusLive do
             >
               not yet
             </div>
+
             <ul class="text-xs space-y-0.5 font-mono" style="color: var(--telvm-shell-muted);">
               <li>- Docker stats/events + push stream</li>
+
               <li>- ProxyPlug Finch → /app/… sandboxes</li>
+
               <li>- Runtime catalog (5 → 21+ images)</li>
+
               <li>- Sessions, Registry, HealthMonitor vitals UI</li>
             </ul>
           </section>
@@ -1229,10 +1476,12 @@ defmodule CompanionWeb.StatusLive do
           >
             agent API · FYI
           </div>
+
           <p class="text-xs mb-2" style="color: var(--telvm-shell-muted);">
             Markdown served from <code class="telvm-accent-dim-text">GET /telvm/api/fyi</code>
             — same origin as the control plane.
           </p>
+
           <iframe
             src={~p"/telvm/api/fyi"}
             class="w-full min-h-[24rem] rounded telvm-panel-border border bg-black/30"
@@ -1251,6 +1500,50 @@ defmodule CompanionWeb.StatusLive do
   end
 
   defp port_preview_active?(_, _, _, _), do: false
+
+  defp logs_preview_active?(:logs, container_id, row_id)
+       when is_binary(container_id) and is_binary(row_id) do
+    container_id == row_id
+  end
+
+  defp logs_preview_active?(_, _, _), do: false
+
+  defp warm_logs_display_id(id) when is_binary(id) do
+    id = String.trim(id)
+
+    if String.length(id) > 12 do
+      String.slice(id, 0, 12) <> "…"
+    else
+      id
+    end
+  end
+
+  defp warm_logs_preamble(container_id, kind) when kind in [:initial, :refresh] do
+    label =
+      case kind do
+        :initial -> "Connected to your container logs"
+        :refresh -> "Refreshed container logs"
+      end
+
+    ts =
+      DateTime.utc_now()
+      |> Calendar.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    "#{label} · container #{warm_logs_display_id(container_id)}\n#{ts}\n\n"
+  end
+
+  defp warm_logs_with_preamble(container_id, raw_text, kind) do
+    warm_logs_preamble(container_id, kind) <> (raw_text || "")
+  end
+
+  defp clear_warm_logs_preview(socket) do
+    socket
+    |> assign(:warm_preview_panel, :iframe)
+    |> assign(:warm_logs_text, nil)
+    |> assign(:warm_logs_container_id, nil)
+    |> assign(:warm_logs_loading, false)
+    |> assign(:warm_logs_error, nil)
+  end
 
   # The Linux ephemeral port range starts at 32768 by default
   # (/proc/sys/net/ipv4/ip_local_port_range). Ports above this threshold are
@@ -1298,9 +1591,44 @@ defmodule CompanionWeb.StatusLive do
       id: c["Id"],
       name: name,
       image: c["Image"],
-      status: c["State"] || c["Status"] || "unknown",
+      status: normalize_warm_list_state(c),
       created: c["Created"]
     }
+  end
+
+  defp normalize_warm_list_state(c) when is_map(c) do
+    case c["State"] do
+      s when is_binary(s) and s != "" ->
+        String.downcase(String.trim(s))
+
+      _ ->
+        case c["Status"] do
+          s when is_binary(s) ->
+            st = String.downcase(String.trim(s))
+
+            cond do
+              String.starts_with?(st, "up ") and String.contains?(st, "paused") -> "paused"
+              String.starts_with?(st, "up ") -> "running"
+              st == "paused" or String.contains?(st, "paused") -> "paused"
+              String.starts_with?(st, "exited") -> "exited"
+              true -> st
+            end
+
+          _ ->
+            "unknown"
+        end
+    end
+  end
+
+  defp warm_machine_running?(m), do: m.status == "running"
+  defp warm_machine_paused?(m), do: m.status == "paused"
+
+  defp warm_machine_destroy_only?(m),
+    do: not warm_machine_running?(m) and not warm_machine_paused?(m)
+
+  defp maybe_followup_warm_refresh(socket) do
+    if connected?(socket), do: Process.send_after(self(), :refresh_warm_machines, 500)
+    socket
   end
 
   defp schedule_warm_refresh do

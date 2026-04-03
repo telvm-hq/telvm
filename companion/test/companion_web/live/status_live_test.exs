@@ -84,4 +84,18 @@ defmodule CompanionWeb.StatusLiveTest do
     assert hd(get_resp_header(conn, "content-type")) =~ "text/markdown"
     assert conn.resp_body =~ "TELVM"
   end
+
+  test "warm assets LiveView defines restart / pause / resume handlers" do
+    path = Path.expand("../../../lib/companion_web/live/status_live.ex", __DIR__)
+    source = File.read!(path)
+
+    assert source =~ ~s(phx-click="restart_machine")
+    assert source =~ ~s(phx-click="pause_machine")
+    assert source =~ ~s(phx-click="unpause_machine")
+    assert source =~ ~s(phx-click="destroy_machine")
+    assert source =~ "handle_event(\"restart_machine\""
+    assert source =~ "handle_event(\"pause_machine\""
+    assert source =~ "handle_event(\"unpause_machine\""
+    assert source =~ "handle_event(\"destroy_machine\""
+  end
 end

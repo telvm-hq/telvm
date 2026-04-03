@@ -135,6 +135,7 @@ defmodule CompanionWeb.ExplorerLive do
           <span class="text-zinc-600 text-[10px]">·</span>
           <span class="text-zinc-500 text-[10px] truncate">{@path}</span>
         </div>
+        
         <div class="flex items-center gap-3 shrink-0">
           <span :if={@loading} class="text-zinc-500 text-[10px] animate-pulse">loading…</span>
           <span :if={@error} class="text-rose-400 text-[10px]" title={@error}>error</span>
@@ -146,6 +147,7 @@ defmodule CompanionWeb.ExplorerLive do
           </a>
         </div>
       </div>
+      
       <div
         :if={@embed?}
         class="flex items-center justify-between px-2 py-1 border-b border-zinc-800 bg-zinc-900/60 shrink-0 gap-2"
@@ -165,8 +167,7 @@ defmodule CompanionWeb.ExplorerLive do
           </a>
         </div>
       </div>
-
-      <%!-- Two-panel body --%>
+       <%!-- Two-panel body --%>
       <div class="flex flex-1 min-h-0 min-w-0">
         <%!-- File tree panel --%>
         <div class="w-60 shrink-0 border-r border-zinc-800 overflow-y-auto bg-black/20 py-1">
@@ -178,11 +179,8 @@ defmodule CompanionWeb.ExplorerLive do
             phx-value-path={parent_clamped(@path, @explorer_root)}
             class="flex items-center gap-2 w-full px-3 py-1 text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
           >
-            <span class="text-zinc-700">↑</span>
-            <span>..</span>
-          </button>
-
-          <%!-- Directory entries (dirs first) --%>
+            <span class="text-zinc-700">↑</span> <span>..</span>
+          </button> <%!-- Directory entries (dirs first) --%>
           <div :for={entry <- @entries}>
             <button
               :if={entry.type == :dir}
@@ -191,8 +189,7 @@ defmodule CompanionWeb.ExplorerLive do
               phx-value-path={join_path(@path, entry.name)}
               class="flex items-center gap-2 w-full px-3 py-1 text-[10px] text-cyan-400/80 hover:text-cyan-300 hover:bg-zinc-800/50 transition-colors text-left"
             >
-              <span class="text-zinc-600">▸</span>
-              <span class="truncate">{entry.name}/</span>
+              <span class="text-zinc-600">▸</span> <span class="truncate">{entry.name}/</span>
             </button>
             <button
               :if={entry.type != :dir}
@@ -206,11 +203,10 @@ defmodule CompanionWeb.ExplorerLive do
                   "text-zinc-400 hover:text-zinc-200"
               ]}
             >
-              <span class="text-zinc-700">·</span>
-              <span class="truncate">{entry.name}</span>
+              <span class="text-zinc-700">·</span> <span class="truncate">{entry.name}</span>
             </button>
           </div>
-
+          
           <div
             :if={@entries == [] and not @loading}
             class="px-3 py-3 text-zinc-700 text-[10px] italic"
@@ -218,8 +214,7 @@ defmodule CompanionWeb.ExplorerLive do
             empty
           </div>
         </div>
-
-        <%!-- Monaco panel --%>
+         <%!-- Monaco panel --%>
         <div class="flex-1 min-w-0 flex flex-col">
           <%!-- File path breadcrumb --%>
           <div
@@ -228,8 +223,7 @@ defmodule CompanionWeb.ExplorerLive do
           >
             {@content_path}
           </div>
-
-          <%!-- Placeholder before file selected --%>
+           <%!-- Placeholder before file selected --%>
           <div
             :if={is_nil(@content) and not @loading}
             class="flex-1 flex flex-col items-center justify-center gap-2 text-zinc-700"
@@ -237,16 +231,14 @@ defmodule CompanionWeb.ExplorerLive do
             <span class="text-[11px]">select a file to view</span>
             <span class="text-[10px] text-zinc-800">{@container_name}</span>
           </div>
-
-          <%!-- Loading placeholder --%>
+           <%!-- Loading placeholder --%>
           <div
             :if={is_nil(@content) and @loading}
             class="flex-1 flex items-center justify-center text-zinc-700 text-[10px] animate-pulse"
           >
             loading…
           </div>
-
-          <%!-- Monaco editor — hook sets it up once content arrives --%>
+           <%!-- Monaco editor — hook sets it up once content arrives --%>
           <div
             :if={@content != nil}
             id="monaco-explorer"
