@@ -30,6 +30,7 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:selected_catalog_id, @default_entry.id)
       |> assign(:destroying, false)
       |> assign(:warm_machines, [])
+      |> assign(:compose_stack_snapshot, {:ok, []})
       |> assign(:soak_busy, false)
       |> assign(:soak_session, nil)
       |> assign(:preflight_session, nil)
@@ -72,6 +73,14 @@ defmodule CompanionWeb.StatusLive do
       action when action in [:machines, :warm_assets] ->
         socket = assign(socket, :page_title, page_title(socket))
         socket = assign(socket, :warm_machines, fetch_warm_machines())
+
+        socket =
+          if action == :warm_assets do
+            assign(socket, :compose_stack_snapshot, fetch_compose_stack_snapshot())
+          else
+            socket
+          end
+
         if connected?(socket), do: schedule_warm_refresh()
         {:noreply, socket}
 
@@ -208,7 +217,7 @@ defmodule CompanionWeb.StatusLive do
       socket
       |> assign(:soak_busy, false)
       |> assign(:soak_session, nil)
-      |> assign(:warm_machines, fetch_warm_machines())
+      |> refresh_warm_machine_assigns()
       |> merge_lab_readiness(meta, result)
 
     socket =
@@ -257,7 +266,7 @@ defmodule CompanionWeb.StatusLive do
   def handle_info(:refresh_warm_machines, socket) do
     if mission_tab?(socket.assigns.live_action) do
       schedule_warm_refresh()
-      {:noreply, assign(socket, :warm_machines, fetch_warm_machines())}
+      {:noreply, refresh_warm_machine_assigns(socket)}
     else
       {:noreply, socket}
     end
@@ -571,7 +580,7 @@ defmodule CompanionWeb.StatusLive do
           else: s
       end)
       |> put_flash(:info, "Destroying container #{String.slice(cid, 0, 12)}…")
-      |> assign(:warm_machines, fetch_warm_machines())
+      |> refresh_warm_machine_assigns()
       |> maybe_followup_warm_refresh()
 
     {:noreply, socket}
@@ -588,7 +597,7 @@ defmodule CompanionWeb.StatusLive do
         socket =
           socket
           |> put_flash(:info, "Restarting container #{String.slice(cid, 0, 12)}…")
-          |> assign(:warm_machines, fetch_warm_machines())
+          |> refresh_warm_machine_assigns()
           |> maybe_followup_warm_refresh()
 
         {:noreply, socket}
@@ -607,7 +616,7 @@ defmodule CompanionWeb.StatusLive do
         socket =
           socket
           |> put_flash(:info, "Pausing container #{String.slice(cid, 0, 12)}…")
-          |> assign(:warm_machines, fetch_warm_machines())
+          |> refresh_warm_machine_assigns()
           |> maybe_followup_warm_refresh()
 
         {:noreply, socket}
@@ -626,7 +635,7 @@ defmodule CompanionWeb.StatusLive do
         socket =
           socket
           |> put_flash(:info, "Resuming container #{String.slice(cid, 0, 12)}…")
-          |> assign(:warm_machines, fetch_warm_machines())
+          |> refresh_warm_machine_assigns()
           |> maybe_followup_warm_refresh()
 
         {:noreply, socket}
@@ -750,6 +759,14 @@ defmodule CompanionWeb.StatusLive do
   # --- Warm assets tab ---
 
   defp warm_assets(assigns) do
+    blueprint =
+      Companion.Topology.Ascii.warm_blueprint(
+        assigns.warm_machines,
+        assigns.compose_stack_snapshot
+      )
+
+    assigns = assign(assigns, :warm_network_blueprint, blueprint)
+
     ~H"""
     <div class="telvm-terminal telvm-console-shell px-3 py-3 sm:px-4 sm:py-4">
       <.terminal_nav active={@live_action} />
@@ -778,6 +795,25 @@ defmodule CompanionWeb.StatusLive do
           <.warm_preview_panel {assigns} />
         </div>
       </div>
+
+      <section
+        class="mt-6 pt-4 telvm-accent-border-b border-t border-dashed"
+        aria-labelledby="warm-network-blueprint-heading"
+      >
+        <h2
+          id="warm-network-blueprint-heading"
+          class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.15em] mb-2 font-semibold"
+        >
+          Network blueprint
+        </h2>
+        <p class="text-[9px] font-mono mb-3" style="color: var(--telvm-shell-muted);">
+          Live snapshot: Compose stack (from Engine) + lab VMs (this tab). Refreshes with the warm list.
+        </p>
+        <pre
+          class="telvm-panel-bg telvm-panel-border border rounded-sm p-3 w-full text-[10px] sm:text-[11px] font-mono whitespace-pre overflow-x-auto"
+          aria-label="Network blueprint: Compose stack, Docker bridge, and warm lab containers"
+        ><%= @warm_network_blueprint %></pre>
+      </section>
     </div>
     """
   end
@@ -1578,6 +1614,52 @@ defmodule CompanionWeb.StatusLive do
       {:error, _} ->
         []
     end
+  end
+
+  defp refresh_warm_machine_assigns(socket) do
+    socket =
+      socket
+      |> assign(:warm_machines, fetch_warm_machines())
+
+    if socket.assigns.live_action == :warm_assets do
+      assign(socket, :compose_stack_snapshot, fetch_compose_stack_snapshot())
+    else
+      socket
+    end
+  end
+
+  defp fetch_compose_stack_snapshot do
+    docker = Companion.Docker.impl()
+
+    case docker.container_list(filters: %{"label" => ["com.docker.compose.project=telvm"]}) do
+      {:ok, containers} ->
+        {:ok, Enum.map(containers, &extract_compose_stack_item/1)}
+
+      {:error, _} ->
+        {:error, :unavailable}
+    end
+  end
+
+  defp extract_compose_stack_item(c) do
+    labels = c["Labels"] || %{}
+
+    service =
+      Map.get(labels, "com.docker.compose.service") ||
+        Map.get(labels, :"com.docker.compose.service") ||
+        "?"
+
+    name =
+      case c["Names"] do
+        [n | _] -> String.trim_leading(n, "/")
+        _ -> String.slice(c["Id"] || "", 0, 12)
+      end
+
+    %{
+      service: service,
+      name: name,
+      state: normalize_warm_list_state(c),
+      id: c["Id"] || ""
+    }
   end
 
   defp extract_warm_info(c) do

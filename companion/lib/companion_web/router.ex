@@ -21,7 +21,7 @@ defmodule CompanionWeb.Router do
     pipe_through :browser
 
     get "/", RedirectController, :to_health
-    get "/topology", RedirectController, :to_health
+    get "/topology", RedirectController, :to_warm
     get "/telvm/api/fyi", FyiController, :show
 
     live_session :default,
