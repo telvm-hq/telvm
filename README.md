@@ -57,7 +57,7 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 
 4. **Preview and visibility:** **`/app/<container>/port/<n>/…`** reverse-proxies HTTP into a container (same links appear as **proxy URLs** from the API and port links on Machines). **`/explore/<container_id>`** is the read-only filesystem + **Monaco** editor shell for code inside a running lab.
 
-**Three URL families on one port:** operator pages (`/`, `/health`, `/warm`, `/machines`, …), **`/telvm/api/…`** for tools, and **`/app/…` + `/explore/…`** to see and open workloads — [Architecture](docs/ARCHITECTURE.md). **PubSub, SSE vs LiveView, and what agents see vs the UI:** [Plumbing](docs/plumbing.md).
+**Three URL families on one port:** operator pages (`/`, `/health`, `/warm`, `/machines`, …), **`/telvm/api/…`** for tools, and **`/app/…` + `/explore/…`** to see and open workloads — [Architecture](docs/ARCHITECTURE.md). **`/topology`** redirects to **`/warm`** (bookmark compatibility). **PubSub, SSE vs LiveView, and what agents see vs the UI:** [Plumbing](docs/plumbing.md).
 
 ### Glossary
 
@@ -65,7 +65,7 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 |------|---------|
 | **companion** | The Phoenix app listening on `:4000`; talks to Docker over **`docker.sock`**. |
 | **BYOI** | Bring your own container **image** for labs and sandboxes. |
-| **Warm assets** | Operator tab at **`/warm`** for lab containers after **Verify**: status, port preview, Explorer, and logs. |
+| **Warm assets** | Operator tab at **`/warm`** for lab containers after **Verify**: status, port preview, Explorer, logs, and a **network blueprint** (ASCII: Compose stack + bridge + lab cards). |
 | **Preview** | Path-based proxy: **`/app/<container>/port/<n>/…`** → container on the Docker bridge. |
 | **Explorer** | Read-only in-container file browser + editor at **`/explore/:id`** (UI may label it “monaco”). |
 | **Machine API** | JSON + SSE under **`/telvm/api`** for agents and scripts — [docs/agent-api.md](docs/agent-api.md). |

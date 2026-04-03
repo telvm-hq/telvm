@@ -4,4 +4,8 @@ defmodule CompanionWeb.RedirectController do
   def to_health(conn, _params) do
     redirect(conn, to: ~p"/health")
   end
+
+  def to_warm(conn, _params) do
+    redirect(conn, to: ~p"/warm")
+  end
 end

@@ -19,12 +19,12 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ "telvm/api/fyi"
   end
 
-  test "GET /topology redirects to /health", %{conn: conn} do
+  test "GET /topology redirects to /warm", %{conn: conn} do
     conn = get(conn, ~p"/topology")
-    assert redirected_to(conn) == "/health"
+    assert redirected_to(conn) == "/warm"
   end
 
-  test "GET /warm renders warm assets layout", %{conn: conn} do
+  test "GET /warm renders warm assets layout and network blueprint", %{conn: conn} do
     conn = get(conn, ~p"/warm")
     html = html_response(conn, 200)
     assert html =~ "Warm assets"
@@ -33,11 +33,15 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ "No warm machines"
     # "endpoints" appears only when at least one warm machine row exists
     assert html =~ "telvm · warm assets"
+    assert html =~ "Network blueprint"
+    assert html =~ "telvm_default"
+    assert html =~ "/telvm/api"
     assert html =~ "lab-preview-frame"
     assert html =~ "No preview yet"
     assert html =~ ~s(href="/warm")
     assert html =~ ~s(href="/machines")
     assert html =~ ~s(href="/health")
+    refute html =~ ~s(href="/topology")
   end
 
   test "GET /machines renders mission console without warm list", %{conn: conn} do
