@@ -1,0 +1,31 @@
+{
+  "name": "telvm-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for telvm — thin wrapper over http://localhost:4000/telvm/api",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "mcp",
+    "telvm",
+    "docker",
+    "cursor"
+  ],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "typescript": "^6.0.2",
+    "vitest": "^3.2.4"
+  }
+}

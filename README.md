@@ -55,6 +55,8 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 
 3. **Agent / automation API:** **`http://localhost:4000/telvm/api`** — JSON for machine lifecycle and **exec**; **SSE** for live updates. **Cursor**, **Claude Code**, **Copilot**, or **`curl`** — full reference: [**Machine API (agents)**](docs/agent-api.md). How live updates relate to the dashboard: [**Plumbing**](docs/plumbing.md). telvm does **not** bundle an LLM.
 
+   **Cursor MCP:** Build the small MCP server in [`mcp/`](mcp/) and register it in Cursor so agents call **telvm tools** (list/exec/delete machines, etc.) instead of hand-written HTTP — [**MCP + Cursor setup**](docs/mcp-cursor.md).
+
 4. **Preview and visibility:** **`/app/<container>/port/<n>/…`** reverse-proxies HTTP into a container (same links appear as **proxy URLs** from the API and port links on Machines). **`/explore/<container_id>`** is the read-only filesystem + **Monaco** editor shell for code inside a running lab.
 
 **Three URL families on one port:** operator pages (`/`, `/health`, `/warm`, `/machines`, …), **`/telvm/api/…`** for tools, and **`/app/…` + `/explore/…`** to see and open workloads — [Architecture](docs/ARCHITECTURE.md). **PubSub, SSE vs LiveView, and what agents see vs the UI:** [Plumbing](docs/plumbing.md).
@@ -120,6 +122,7 @@ README banner image: [`docs/assets/TELVM_IMAGE_BANNER.png`](docs/assets/TELVM_IM
 |-----|----------|
 | [docs/quickstart.md](docs/quickstart.md) | `docker compose up`, routes, tests, GHCR lab image, env |
 | [docs/agent-api.md](docs/agent-api.md) | **`/telvm/api`** endpoints, SSE events, scope |
+| [docs/mcp-cursor.md](docs/mcp-cursor.md) | **Cursor + MCP**: build `mcp/`, `.cursor/mcp.json`, verify tools |
 | [docs/plumbing.md](docs/plumbing.md) | PubSub topics, dashboard vs **`/telvm/api/stream`**, Docker pull vs SSE |
 | [docs/assets/ARCHITECTURE-DIAGRAM.md](docs/assets/ARCHITECTURE-DIAGRAM.md) | Mermaid overview, Simple Icons row |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Diagrams, ProxyPlug, **OTP / Finch / unix socket**, Explorer, agent loop, tests |

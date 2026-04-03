@@ -16,6 +16,10 @@ companion/priv/static/assets/
 # If you run npm/yarn on the host inside companion/assets/
 companion/assets/node_modules/
 
+# MCP package (Node / TypeScript)
+mcp/node_modules/
+mcp/dist/
+
 # Environment
 .env
 .env.*
