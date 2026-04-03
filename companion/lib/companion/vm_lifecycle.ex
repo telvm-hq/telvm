@@ -11,6 +11,9 @@ defmodule Companion.VmLifecycle do
   When `use_image_default_cmd` is true (via `TELVM_LAB_USE_IMAGE_CMD=1` or application config),
   `"Cmd"` is omitted so Engine uses the image `CMD`/`ENTRYPOINT`—required for registry-backed
   lab images that embed their own command.
+
+  Optional `:container_env` is a keyword list or list of `{key, value}` pairs merged into
+  the Engine `"Env"` field (e.g. `DATABASE_URL` for stacks that expect it).
   """
   def lab_container_create_attrs(cfg, name) when is_list(cfg) and is_binary(name) do
     port = cfg[:exposed_port]
@@ -41,12 +44,34 @@ defmodule Companion.VmLifecycle do
       }
     }
 
+    base = put_container_env(base, cfg)
+
     if Keyword.get(cfg, :use_image_default_cmd, false) do
       base
     else
       Map.put(base, "Cmd", cfg[:container_cmd])
     end
   end
+
+  defp put_container_env(base, cfg) do
+    case normalize_container_env(cfg[:container_env]) do
+      [] -> base
+      pairs -> Map.put(base, "Env", pairs)
+    end
+  end
+
+  defp normalize_container_env(nil), do: []
+
+  defp normalize_container_env(kw) when is_list(kw) do
+    Enum.flat_map(kw, fn
+      {k, v} when is_atom(k) -> ["#{k}=#{env_value(v)}"]
+      {k, v} when is_binary(k) -> ["#{k}=#{env_value(v)}"]
+      _ -> []
+    end)
+  end
+
+  defp env_value(v) when is_binary(v), do: v
+  defp env_value(v), do: to_string(v)
 
   @doc """
   Base config from defaults, application env, and `TELVM_LAB_*` / `TELVM_LAB_USE_IMAGE_CMD`,

@@ -12,7 +12,7 @@ defmodule CompanionWeb.MachineController do
       GET    /telvm/api/machines/:id/stats       one-shot resource stats (optional ?raw=1)
       GET    /telvm/api/machines/:id/logs        one-shot stdout/stderr log tail (optional ?tail=)
       GET    /telvm/api/machines/:id             single machine detail
-      POST   /telvm/api/machines                 create + start container
+      POST   /telvm/api/machines                 create + start container (optional `env` for container Env)
       POST   /telvm/api/machines/:id/exec        run a command inside a container
       POST   /telvm/api/machines/:id/restart     Engine restart (optional ?t=seconds)
       POST   /telvm/api/machines/:id/pause       freeze cgroup (not a reload/restart)
@@ -87,6 +87,7 @@ defmodule CompanionWeb.MachineController do
       |> maybe_put_kw(:workspace, params["workspace"])
       |> maybe_put_kw(:container_cmd, params["cmd"])
       |> maybe_put_kw_bool(:use_image_default_cmd, params["use_image_cmd"])
+      |> maybe_put_container_env(params["env"])
 
     cfg = VmLifecycle.manager_preflight_config(overrides)
     name = "telvm-vm-mgr-" <> Integer.to_string(:erlang.unique_integer([:positive]))
@@ -518,6 +519,31 @@ defmodule CompanionWeb.MachineController do
   defp maybe_put_kw_bool(kw, key, "true"), do: Keyword.put(kw, key, true)
   defp maybe_put_kw_bool(kw, key, "false"), do: Keyword.put(kw, key, false)
   defp maybe_put_kw_bool(kw, _key, _), do: kw
+
+  defp maybe_put_container_env(kw, nil), do: kw
+  defp maybe_put_container_env(kw, env) when is_list(env) do
+    pairs =
+      Enum.flat_map(env, fn
+        %{"name" => k, "value" => v} when is_binary(k) ->
+          [{k, to_string(v)}]
+
+        s when is_binary(s) ->
+          case String.split(s, "=", parts: 2) do
+            [k, v] -> [{k, v}]
+            _ -> []
+          end
+
+        _ ->
+          []
+      end)
+
+    case pairs do
+      [] -> kw
+      _ -> Keyword.put(kw, :container_env, pairs)
+    end
+  end
+
+  defp maybe_put_container_env(kw, _), do: kw
 
   defp restart_stop_timeout(conn) do
     case conn.query_params["t"] do

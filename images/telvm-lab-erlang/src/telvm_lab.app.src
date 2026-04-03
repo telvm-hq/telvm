@@ -1,0 +1,8 @@
+{application, telvm_lab, [
+  {description, "telvm certified lab (Cowboy probe)"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, {telvm_lab_app, []}},
+  {applications, [kernel, stdlib, sasl, cowboy]},
+  {env, []}
+]}.

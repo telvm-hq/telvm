@@ -30,6 +30,18 @@ defmodule Companion.VmLifecycleTest do
       refute Map.has_key?(attrs, "Cmd")
       assert attrs["Image"] == "node:22-alpine"
     end
+
+    test "includes Env when container_env is set" do
+      cfg =
+        VmLifecycle.manager_preflight_config(
+          image: "ghcr.io/example/lab:main",
+          use_image_default_cmd: true,
+          container_env: [{"FOO", "bar"}, {"BAZ", "1"}]
+        )
+
+      attrs = VmLifecycle.lab_container_create_attrs(cfg, "telvm-env-1")
+      assert attrs["Env"] == ["FOO=bar", "BAZ=1"]
+    end
   end
 
   describe "manager_preflight_config/1 merge" do
