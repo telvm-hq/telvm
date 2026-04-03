@@ -152,6 +152,103 @@ defmodule CompanionWeb.MachineControllerTest do
   end
 
   # ---------------------------------------------------------------------------
+  # POST /telvm/api/machines/:id/restart
+  # ---------------------------------------------------------------------------
+
+  describe "POST /telvm/api/machines/:id/restart" do
+    test "returns 200 with machine payload", %{conn: conn} do
+      conn = post(conn, "/telvm/api/machines/mock_id/restart", %{})
+      body = json_response(conn, 200)
+      assert body["machine"]
+      assert body["machine"]["id"]
+    end
+
+    test "returns 404 when adapter reports not found", %{conn: conn} do
+      conn = post(conn, "/telvm/api/machines/__not_found__/restart", %{})
+      assert json_response(conn, 404)["error"]
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # GET /telvm/api/machines/:id/stats
+  # ---------------------------------------------------------------------------
+
+  describe "GET /telvm/api/machines/:id/stats" do
+    test "returns trimmed stats by default", %{conn: conn} do
+      conn = get(conn, "/telvm/api/machines/mock_id/stats")
+      stats = json_response(conn, 200)["stats"]
+
+      for key <-
+            ~w(cpu_percent memory_usage_bytes memory_limit_bytes network_rx_bytes network_tx_bytes) do
+        assert Map.has_key?(stats, key), "expected stats to have key #{key}"
+      end
+    end
+
+    test "returns raw stats when raw=1", %{conn: conn} do
+      conn = get(conn, "/telvm/api/machines/mock_id/stats?raw=1")
+      stats = json_response(conn, 200)["stats"]
+      assert stats["memory_stats"]
+      assert stats["cpu_stats"]
+    end
+
+    test "returns 404 when stats are not found", %{conn: conn} do
+      conn = get(conn, "/telvm/api/machines/__not_found__/stats")
+      assert json_response(conn, 404)["error"]
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # GET /telvm/api/machines/:id/logs
+  # ---------------------------------------------------------------------------
+
+  describe "GET /telvm/api/machines/:id/logs" do
+    test "returns logs text", %{conn: conn} do
+      conn = get(conn, "/telvm/api/machines/mock_id/logs")
+      body = json_response(conn, 200)
+      assert is_binary(body["logs"])
+      assert body["logs"] =~ "mock log"
+    end
+
+    test "accepts optional tail query", %{conn: conn} do
+      conn = get(conn, "/telvm/api/machines/mock_id/logs?tail=100")
+      assert json_response(conn, 200)["logs"]
+    end
+
+    test "returns 404 when logs are not found", %{conn: conn} do
+      conn = get(conn, "/telvm/api/machines/__not_found__/logs")
+      assert json_response(conn, 404)["error"]
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # POST /telvm/api/machines/:id/pause and unpause
+  # ---------------------------------------------------------------------------
+
+  describe "POST /telvm/api/machines/:id/pause" do
+    test "returns ok", %{conn: conn} do
+      conn = post(conn, "/telvm/api/machines/mock_id/pause", %{})
+      assert json_response(conn, 200)["ok"] == true
+    end
+
+    test "returns 404 when not found", %{conn: conn} do
+      conn = post(conn, "/telvm/api/machines/__not_found__/pause", %{})
+      assert json_response(conn, 404)["error"]
+    end
+  end
+
+  describe "POST /telvm/api/machines/:id/unpause" do
+    test "returns ok", %{conn: conn} do
+      conn = post(conn, "/telvm/api/machines/mock_id/unpause", %{})
+      assert json_response(conn, 200)["ok"] == true
+    end
+
+    test "returns 404 when not found", %{conn: conn} do
+      conn = post(conn, "/telvm/api/machines/__not_found__/unpause", %{})
+      assert json_response(conn, 404)["error"]
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # DELETE /telvm/api/machines/:id
   # ---------------------------------------------------------------------------
 

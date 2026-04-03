@@ -36,6 +36,18 @@ defmodule Companion.DockerMockTest do
       assert :ok = DockerMock.container_stop("id", [])
     end
 
+    test "container_restart/2 happy path" do
+      assert :ok = DockerMock.container_restart("id", [])
+    end
+
+    test "container_restart/2 error branch" do
+      assert {:error, :mock_error} = DockerMock.container_restart("__error__", [])
+    end
+
+    test "container_restart/2 not_found branch" do
+      assert {:error, :not_found} = DockerMock.container_restart("__not_found__", [])
+    end
+
     test "container_remove/2" do
       assert :ok = DockerMock.container_remove("id", [])
     end
@@ -48,6 +60,10 @@ defmodule Companion.DockerMockTest do
       assert {:error, :mock_error} = DockerMock.container_pause("__error__")
     end
 
+    test "container_pause/1 not_found branch" do
+      assert {:error, :not_found} = DockerMock.container_pause("__not_found__")
+    end
+
     test "container_unpause/1" do
       assert :ok = DockerMock.container_unpause("id")
     end
@@ -56,8 +72,34 @@ defmodule Companion.DockerMockTest do
       assert {:error, :mock_error} = DockerMock.container_unpause("__error__")
     end
 
-    test "container_stats/1" do
-      assert {:ok, %{}} = DockerMock.container_stats("id")
+    test "container_unpause/1 not_found branch" do
+      assert {:error, :not_found} = DockerMock.container_unpause("__not_found__")
+    end
+
+    test "container_stats/1 returns sample stats" do
+      assert {:ok, %{"memory_stats" => _}} = DockerMock.container_stats("id")
+    end
+
+    test "container_stats/1 error branch" do
+      assert {:error, :mock_error} = DockerMock.container_stats("__error__")
+    end
+
+    test "container_stats/1 not_found branch" do
+      assert {:error, :not_found} = DockerMock.container_stats("__not_found__")
+    end
+
+    test "container_logs/2 returns text" do
+      assert {:ok, text} = DockerMock.container_logs("id", [])
+      assert is_binary(text)
+      assert text =~ "mock log"
+    end
+
+    test "container_logs/2 error branch" do
+      assert {:error, :mock_error} = DockerMock.container_logs("__error__", [])
+    end
+
+    test "container_logs/2 not_found branch" do
+      assert {:error, :not_found} = DockerMock.container_logs("__not_found__", [])
     end
 
     test "image_list/1" do

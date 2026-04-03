@@ -13,6 +13,8 @@ To start your Phoenix server locally:
 
 Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
 
+Use the header **light / dark** toggle for theme (choice is saved in the browser). Lab containers that have passed **Verify** on **Machines** appear under **Warm assets**; there you can **restart**, **pause**, **resume**, or **destroy**, open **files** or **logs**, and preview published ports (requires Docker socket access from the companion process).
+
 Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
 
 ## Learn more

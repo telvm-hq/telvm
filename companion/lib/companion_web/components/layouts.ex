@@ -51,6 +51,7 @@ defmodule CompanionWeb.Layouts do
             <span class="text-sm font-semibold tracking-tight">telvm companion</span>
           </a>
         </div>
+        
         <div class="flex-none">
           <ul class="flex flex-wrap px-1 gap-x-2 gap-y-1 items-center justify-end">
             <li>
@@ -61,6 +62,7 @@ defmodule CompanionWeb.Layouts do
                 Warm
               </a>
             </li>
+            
             <li>
               <a
                 href={~p"/machines"}
@@ -69,6 +71,7 @@ defmodule CompanionWeb.Layouts do
                 Machines
               </a>
             </li>
+            
             <li>
               <a
                 href={~p"/health"}
@@ -77,14 +80,12 @@ defmodule CompanionWeb.Layouts do
                 Pre-flight
               </a>
             </li>
-            <li class="flex items-center gap-1">
-              <.accent_toggle />
-              <.theme_toggle />
-            </li>
+            
+            <li class="flex items-center gap-1"><.accent_toggle /> <.theme_toggle /></li>
           </ul>
         </div>
       </header>
-
+      
       <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8 transition-colors duration-200">
         <div class="mx-auto w-full max-w-7xl space-y-4">
           <%= if Map.has_key?(assigns, :inner_content) && assigns.inner_content do %>
@@ -94,8 +95,7 @@ defmodule CompanionWeb.Layouts do
           <% end %>
         </div>
       </main>
-
-      <.flash_group flash={@flash} />
+       <.flash_group flash={@flash} />
     </div>
     """
   end
@@ -113,9 +113,7 @@ defmodule CompanionWeb.Layouts do
   def flash_group(assigns) do
     ~H"""
     <div id={@id} aria-live="polite">
-      <.flash kind={:info} flash={@flash} />
-      <.flash kind={:error} flash={@flash} />
-
+      <.flash kind={:info} flash={@flash} /> <.flash kind={:error} flash={@flash} />
       <.flash
         id="client-error"
         kind={:error}
@@ -127,7 +125,7 @@ defmodule CompanionWeb.Layouts do
         {gettext("Attempting to reconnect")}
         <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
       </.flash>
-
+      
       <.flash
         id="server-error"
         kind={:error}
@@ -186,35 +184,27 @@ defmodule CompanionWeb.Layouts do
   end
 
   @doc """
-  Provides dark vs light theme toggle based on themes defined in app.css.
+  Light / dark theme toggle (explicit only; no OS “system” mode). Themes are defined in app.css.
 
   See <head> in root.html.heex which applies the theme before page load.
   """
   def theme_toggle(assigns) do
     ~H"""
     <div class="card relative flex flex-row items-center border-2 border-base-300 bg-base-300 rounded-full">
-      <div class="absolute w-1/3 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=light]_&]:left-1/3 [[data-theme=dark]_&]:left-2/3 transition-[left]" />
-
+      <div class="absolute w-1/2 h-full rounded-full border-1 border-base-200 bg-base-100 brightness-200 left-0 [[data-theme=dark]_&]:left-1/2 transition-[left]" />
       <button
-        class="flex p-2 cursor-pointer w-1/3"
-        phx-click={JS.dispatch("phx:set-theme")}
-        data-phx-theme="system"
-      >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
-      </button>
-
-      <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="flex p-2 cursor-pointer w-1/2"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
+        title="Light theme"
       >
         <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>
-
       <button
-        class="flex p-2 cursor-pointer w-1/3"
+        class="flex p-2 cursor-pointer w-1/2"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
+        title="Dark theme"
       >
         <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
       </button>

@@ -81,6 +81,30 @@ defmodule Companion.Docker.HTTP do
   end
 
   @impl true
+  def container_restart(id, opts) do
+    t = Keyword.get(opts, :timeout_sec, 10)
+    q = URI.encode_query(%{"t" => Integer.to_string(t)})
+    rel = path("containers/#{enc_id(id)}/restart") <> "?" <> q
+
+    case request(:post, rel, "{}", "application/json") do
+      {:ok, %Finch.Response{status: status}} when status in [200, 204] ->
+        :ok
+
+      {:ok, %Finch.Response{status: 304, body: ""}} ->
+        :ok
+
+      {:ok, %Finch.Response{status: 404, body: _body}} ->
+        {:error, :not_found}
+
+      {:ok, %Finch.Response{status: s, body: b}} ->
+        {:error, {:http, s, b}}
+
+      {:error, _} = e ->
+        e
+    end
+  end
+
+  @impl true
   def container_remove(id, opts) do
     force = if Keyword.get(opts, :force, false), do: "1", else: "0"
     q = URI.encode_query(%{"force" => force, "v" => "1"})
@@ -88,13 +112,49 @@ defmodule Companion.Docker.HTTP do
   end
 
   @impl true
-  def container_pause(id), do: post_no_body(path("containers/#{enc_id(id)}/pause"))
+  def container_pause(id), do: post_no_body_not_found(path("containers/#{enc_id(id)}/pause"))
 
   @impl true
-  def container_unpause(id), do: post_no_body(path("containers/#{enc_id(id)}/unpause"))
+  def container_unpause(id), do: post_no_body_not_found(path("containers/#{enc_id(id)}/unpause"))
 
   @impl true
-  def container_stats(_id), do: {:error, :not_implemented}
+  def container_logs(id, opts) do
+    tail = opts |> Keyword.get(:tail, 500) |> cap_log_tail()
+    timestamps? = Keyword.get(opts, :timestamps, true)
+
+    q =
+      URI.encode_query(%{
+        "stdout" => "true",
+        "stderr" => "true",
+        "timestamps" => if(timestamps?, do: "true", else: "false"),
+        "tail" => Integer.to_string(tail),
+        "stream" => "false"
+      })
+
+    rel = path("containers/#{enc_id(id)}/logs") <> "?" <> q
+
+    case get_binary(rel) do
+      {:ok, body} -> {:ok, demux_mixed_stream(body)}
+      {:error, _} = e -> e
+    end
+  end
+
+  defp cap_log_tail(n) when not is_integer(n), do: 500
+  defp cap_log_tail(n) when n < 1, do: 1
+  defp cap_log_tail(n) when n > 10_000, do: 10_000
+  defp cap_log_tail(n), do: n
+
+  @impl true
+  def container_stats(id) do
+    q = URI.encode_query(%{"stream" => "0"})
+    rel = path("containers/#{enc_id(id)}/stats") <> "?" <> q
+
+    case get_json(rel) do
+      {:ok, map} when is_map(map) -> {:ok, map}
+      {:error, {:http, 404, _}} -> {:error, :not_found}
+      {:error, _} = e -> e
+    end
+  end
 
   @impl true
   def container_exec(id, cmd, opts) when is_list(cmd) do
@@ -193,6 +253,22 @@ defmodule Companion.Docker.HTTP do
 
   defp demux_stdout(_, acc), do: IO.iodata_to_binary(acc)
 
+  defp demux_mixed_stream(data) when is_binary(data), do: demux_mixed_stream(data, [])
+
+  defp demux_mixed_stream(
+         <<type, _::binary-size(3), size::32-big, payload::binary-size(size), rest::binary>>,
+         acc
+       )
+       when type in [1, 2] do
+    demux_mixed_stream(rest, [acc, payload])
+  end
+
+  defp demux_mixed_stream(<<>>, acc), do: IO.iodata_to_binary(acc)
+
+  defp demux_mixed_stream(trailing, acc) when is_binary(trailing) do
+    IO.iodata_to_binary([acc, trailing])
+  end
+
   @impl true
   def image_list(_opts) do
     case get_json(path("images/json")) do
@@ -235,6 +311,22 @@ defmodule Companion.Docker.HTTP do
     Application.get_env(:companion, :docker_socket, "/var/run/docker.sock")
   end
 
+  defp get_binary(relative_path) do
+    case request(:get, relative_path, "", "") do
+      {:ok, %Finch.Response{status: 200, body: body}} ->
+        {:ok, body}
+
+      {:ok, %Finch.Response{status: 404, body: _body}} ->
+        {:error, :not_found}
+
+      {:ok, %Finch.Response{status: status, body: body}} ->
+        {:error, {:http, status, body}}
+
+      {:error, _} = e ->
+        e
+    end
+  end
+
   defp get_json(relative_path) do
     case request(:get, relative_path, "", "") do
       {:ok, %Finch.Response{status: 200, body: body}} ->
@@ -258,6 +350,25 @@ defmodule Companion.Docker.HTTP do
 
       {:ok, %Finch.Response{status: 304, body: ""}} ->
         :ok
+
+      {:ok, %Finch.Response{status: s, body: b}} ->
+        {:error, {:http, s, b}}
+
+      {:error, _} = e ->
+        e
+    end
+  end
+
+  defp post_no_body_not_found(relative_path) do
+    case request(:post, relative_path, "{}", "application/json") do
+      {:ok, %Finch.Response{status: status}} when status in [200, 204] ->
+        :ok
+
+      {:ok, %Finch.Response{status: 304, body: ""}} ->
+        :ok
+
+      {:ok, %Finch.Response{status: 404, body: _body}} ->
+        {:error, :not_found}
 
       {:ok, %Finch.Response{status: s, body: b}} ->
         {:error, {:http, s, b}}

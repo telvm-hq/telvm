@@ -51,7 +51,7 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 1. **Run:** `git clone https://github.com/telvm-hq/telvm.git && cd telvm && docker compose up --build`  
    Default stack: **Postgres**, **`vm_node`** (example labeled sandbox), and the **companion** on **`http://localhost:4000`**.
 
-2. **Operator UI (browser):** [http://localhost:4000](http://localhost:4000) redirects to **Pre-flight** (`/health`); **Machines** (`/machines`) lists containers, **BYOI** / lab images, **Verify** (VM manager pre-flight + 15s soak) and **Extended soak (60s)**. Human-facing dashboard (LiveView).
+2. **Operator UI (browser):** [http://localhost:4000](http://localhost:4000) redirects to **Pre-flight** (`/health`); **Machines** (`/machines`) lists containers, **BYOI** / lab images, **Verify** (VM manager pre-flight + 15s soak) and **Extended soak (60s)**. Human-facing dashboard (LiveView). **Core loop:** pull any lab image, run **Verify**; when it passes, that container shows up on **Warm assets** (`/warm`) with port preview, **files** (Explorer / Monaco), and **container logs** (same log text is available to agents at **`GET /telvm/api/machines/:id/logs`**).
 
 3. **Agent / automation API:** **`http://localhost:4000/telvm/api`** — JSON for machine lifecycle and **exec**; **SSE** for live updates. **Cursor**, **Claude Code**, **Copilot**, or **`curl`** — full reference: [**Machine API (agents)**](docs/agent-api.md). How live updates relate to the dashboard: [**Plumbing**](docs/plumbing.md). telvm does **not** bundle an LLM.
 
@@ -65,7 +65,7 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 |------|---------|
 | **companion** | The Phoenix app listening on `:4000`; talks to Docker over **`docker.sock`**. |
 | **BYOI** | Bring your own container **image** for labs and sandboxes. |
-| **Warm assets** | Operator tab at **`/warm`** for warm-machine–oriented status and actions. |
+| **Warm assets** | Operator tab at **`/warm`** for lab containers after **Verify**: status, port preview, Explorer, and logs. |
 | **Preview** | Path-based proxy: **`/app/<container>/port/<n>/…`** → container on the Docker bridge. |
 | **Explorer** | Read-only in-container file browser + editor at **`/explore/:id`** (UI may label it “monaco”). |
 | **Machine API** | JSON + SSE under **`/telvm/api`** for agents and scripts — [docs/agent-api.md](docs/agent-api.md). |

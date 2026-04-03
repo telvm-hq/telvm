@@ -10,21 +10,19 @@
     <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
     </script>
+
     <script>
       (() => {
         const setTheme = (theme) => {
-          if (theme === "system") {
-            localStorage.removeItem("phx:theme");
-            document.documentElement.removeAttribute("data-theme");
-          } else {
-            localStorage.setItem("phx:theme", theme);
-            document.documentElement.setAttribute("data-theme", theme);
-          }
+          const t = theme === "dark" ? "dark" : "light";
+          localStorage.setItem("phx:theme", t);
+          document.documentElement.setAttribute("data-theme", t);
         };
         if (!document.documentElement.hasAttribute("data-theme")) {
-          setTheme(localStorage.getItem("phx:theme") || "system");
+          const stored = localStorage.getItem("phx:theme");
+          setTheme(stored === "dark" || stored === "light" ? stored : "light");
         }
-        window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "system"));
+        window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "light"));
 
         window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
 
@@ -41,7 +39,6 @@
       })();
     </script>
   </head>
-  <body class="min-h-screen antialiased">
-    {@inner_content}
-  </body>
+
+  <body class="min-h-screen antialiased">{@inner_content}</body>
 </html>

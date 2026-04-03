@@ -23,18 +23,51 @@ defmodule Companion.Docker.Mock do
   def container_stop(_id, _opts), do: :ok
 
   @impl true
+  def container_restart("__error__", _opts), do: {:error, :mock_error}
+  def container_restart("__not_found__", _opts), do: {:error, :not_found}
+  def container_restart(_id, _opts), do: :ok
+
+  @impl true
   def container_remove(_id, _opts), do: :ok
 
   @impl true
+  def container_pause("__not_found__"), do: {:error, :not_found}
   def container_pause("__error__"), do: {:error, :mock_error}
   def container_pause(_id), do: :ok
 
   @impl true
+  def container_unpause("__not_found__"), do: {:error, :not_found}
   def container_unpause("__error__"), do: {:error, :mock_error}
   def container_unpause(_id), do: :ok
 
   @impl true
-  def container_stats(_id), do: {:ok, %{}}
+  def container_stats("__error__"), do: {:error, :mock_error}
+  def container_stats("__not_found__"), do: {:error, :not_found}
+
+  def container_stats(_id) do
+    {:ok,
+     %{
+       "cpu_stats" => %{
+         "cpu_usage" => %{"total_usage" => 100_000_000_000},
+         "system_cpu_usage" => 500_000_000_000,
+         "online_cpus" => 2
+       },
+       "precpu_stats" => %{
+         "cpu_usage" => %{"total_usage" => 99_000_000_000},
+         "system_cpu_usage" => 499_000_000_000
+       },
+       "memory_stats" => %{"usage" => 128_000_000, "limit" => 1_073_741_824},
+       "networks" => %{"eth0" => %{"rx_bytes" => 1000, "tx_bytes" => 2000}}
+     }}
+  end
+
+  @impl true
+  def container_logs("__error__", _opts), do: {:error, :mock_error}
+  def container_logs("__not_found__", _opts), do: {:error, :not_found}
+
+  def container_logs(_id, _opts) do
+    {:ok, "2024-01-01T00:00:00.000000000Z mock log line stdout\n"}
+  end
 
   @impl true
   def container_exec(_id, ["cat", "/proc/net/tcp", "/proc/net/tcp6"], _opts) do

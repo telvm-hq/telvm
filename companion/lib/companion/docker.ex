@@ -14,10 +14,12 @@ defmodule Companion.Docker do
   @callback container_create(attrs :: map()) :: {:ok, container_id()} | {:error, term()}
   @callback container_start(container_id(), opts()) :: :ok | {:error, term()}
   @callback container_stop(container_id(), opts()) :: :ok | {:error, term()}
+  @callback container_restart(container_id(), opts()) :: :ok | {:error, term()}
   @callback container_remove(container_id(), opts()) :: :ok | {:error, term()}
   @callback container_pause(container_id()) :: :ok | {:error, term()}
   @callback container_unpause(container_id()) :: :ok | {:error, term()}
   @callback container_stats(container_id()) :: {:ok, map()} | {:error, term()}
+  @callback container_logs(container_id(), opts()) :: {:ok, String.t()} | {:error, term()}
   @callback container_exec(container_id(), cmd :: [String.t()], opts()) ::
               {:ok, String.t()} | {:error, term()}
 
