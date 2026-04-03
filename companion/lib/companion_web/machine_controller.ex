@@ -8,12 +8,17 @@ defmodule CompanionWeb.MachineController do
 
   Endpoint summary:
 
-      GET    /telvm/api/machines              list warm lab containers
-      GET    /telvm/api/machines/:id          single machine detail
-      POST   /telvm/api/machines              create + start container
-      POST   /telvm/api/machines/:id/exec     run a command inside a container
-      DELETE /telvm/api/machines/:id          stop + remove container
-      GET    /telvm/api/stream                SSE stream of state changes
+      GET    /telvm/api/machines                 list warm lab containers
+      GET    /telvm/api/machines/:id/stats       one-shot resource stats (optional ?raw=1)
+      GET    /telvm/api/machines/:id/logs        one-shot stdout/stderr log tail (optional ?tail=)
+      GET    /telvm/api/machines/:id             single machine detail
+      POST   /telvm/api/machines                 create + start container
+      POST   /telvm/api/machines/:id/exec        run a command inside a container
+      POST   /telvm/api/machines/:id/restart     Engine restart (optional ?t=seconds)
+      POST   /telvm/api/machines/:id/pause       freeze cgroup (not a reload/restart)
+      POST   /telvm/api/machines/:id/unpause     resume from pause
+      DELETE /telvm/api/machines/:id             stop + remove container
+      GET    /telvm/api/stream                   SSE stream of state changes
   """
 
   use CompanionWeb, :controller
@@ -140,6 +145,139 @@ defmodule CompanionWeb.MachineController do
           |> put_status(502)
           |> json(%{error: "Exec failed: #{inspect(reason)}"})
       end
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # POST /telvm/api/machines/:id/restart
+  # ---------------------------------------------------------------------------
+
+  def restart(conn, %{"id" => id}) do
+    docker = Docker.impl()
+    t = restart_stop_timeout(conn)
+
+    case docker.container_restart(id, timeout_sec: t) do
+      :ok ->
+        case docker.container_inspect(id) do
+          {:ok, info} ->
+            machine = build_machine_from_inspect(docker, info)
+            json(conn, %{machine: machine})
+
+          {:error, _} ->
+            json(conn, %{ok: true})
+        end
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(404)
+        |> json(%{error: "Machine not found"})
+
+      {:error, reason} ->
+        conn
+        |> put_status(502)
+        |> json(%{error: "Failed to restart machine: #{inspect(reason)}"})
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # GET /telvm/api/machines/:id/stats
+  # ---------------------------------------------------------------------------
+
+  def stats(conn, %{"id" => id} = params) do
+    docker = Docker.impl()
+    raw? = stats_raw_param?(params["raw"])
+
+    case docker.container_stats(id) do
+      {:ok, map} when raw? ->
+        json(conn, %{stats: map})
+
+      {:ok, map} ->
+        json(conn, %{stats: trim_container_stats(map)})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(404)
+        |> json(%{error: "Machine not found"})
+
+      {:error, reason} ->
+        conn
+        |> put_status(502)
+        |> json(%{error: "Stats failed: #{inspect(reason)}"})
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # GET /telvm/api/machines/:id/logs
+  # ---------------------------------------------------------------------------
+
+  def logs(conn, %{"id" => id} = params) do
+    docker = Docker.impl()
+    tail = logs_tail_param(params["tail"])
+
+    case docker.container_logs(id, tail: tail) do
+      {:ok, text} ->
+        json(conn, %{logs: text})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(404)
+        |> json(%{error: "Machine not found"})
+
+      {:error, reason} ->
+        conn
+        |> put_status(502)
+        |> json(%{error: "Logs failed: #{inspect(reason)}"})
+    end
+  end
+
+  defp logs_tail_param(nil), do: 500
+
+  defp logs_tail_param(raw) when is_binary(raw) do
+    case Integer.parse(raw) do
+      {n, _} -> min(max(n, 1), 10_000)
+      :error -> 500
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # POST /telvm/api/machines/:id/pause
+  # ---------------------------------------------------------------------------
+
+  def pause(conn, %{"id" => id}) do
+    case Docker.impl().container_pause(id) do
+      :ok ->
+        json(conn, %{ok: true})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(404)
+        |> json(%{error: "Machine not found"})
+
+      {:error, reason} ->
+        conn
+        |> put_status(502)
+        |> json(%{error: "Pause failed: #{inspect(reason)}"})
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # POST /telvm/api/machines/:id/unpause
+  # ---------------------------------------------------------------------------
+
+  def unpause(conn, %{"id" => id}) do
+    case Docker.impl().container_unpause(id) do
+      :ok ->
+        json(conn, %{ok: true})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(404)
+        |> json(%{error: "Machine not found"})
+
+      {:error, reason} ->
+        conn
+        |> put_status(502)
+        |> json(%{error: "Unpause failed: #{inspect(reason)}"})
     end
   end
 
@@ -380,4 +518,70 @@ defmodule CompanionWeb.MachineController do
   defp maybe_put_kw_bool(kw, key, "true"), do: Keyword.put(kw, key, true)
   defp maybe_put_kw_bool(kw, key, "false"), do: Keyword.put(kw, key, false)
   defp maybe_put_kw_bool(kw, _key, _), do: kw
+
+  defp restart_stop_timeout(conn) do
+    case conn.query_params["t"] do
+      nil ->
+        10
+
+      "" ->
+        10
+
+      s when is_binary(s) ->
+        case Integer.parse(s) do
+          {n, _} when n >= 0 and n <= 300 -> n
+          _ -> 10
+        end
+
+      _ ->
+        10
+    end
+  end
+
+  defp stats_raw_param?(v) when v in [true, "true", "1", 1], do: true
+  defp stats_raw_param?(_), do: false
+
+  defp trim_container_stats(raw) when is_map(raw) do
+    %{
+      cpu_percent: cpu_percent_from_engine_stats(raw),
+      memory_usage_bytes: get_in(raw, ["memory_stats", "usage"]),
+      memory_limit_bytes: get_in(raw, ["memory_stats", "limit"]),
+      network_rx_bytes: sum_network_bytes(raw, "rx_bytes"),
+      network_tx_bytes: sum_network_bytes(raw, "tx_bytes")
+    }
+  end
+
+  defp cpu_percent_from_engine_stats(%{"cpu_stats" => cpu, "precpu_stats" => pre})
+       when is_map(cpu) and is_map(pre) do
+    cpu_total = get_in(cpu, ["cpu_usage", "total_usage"]) || 0
+    pre_total = get_in(pre, ["cpu_usage", "total_usage"]) || 0
+    cpu_delta = cpu_total - pre_total
+
+    sys = cpu["system_cpu_usage"] || 0
+    pre_sys = pre["system_cpu_usage"] || 0
+    system_delta = sys - pre_sys
+
+    n = cpu["online_cpus"] || 1
+
+    if system_delta > 0 and cpu_delta >= 0 do
+      Float.round(cpu_delta / system_delta * n * 100.0, 2)
+    else
+      nil
+    end
+  end
+
+  defp cpu_percent_from_engine_stats(_), do: nil
+
+  defp sum_network_bytes(raw, key) when key in ["rx_bytes", "tx_bytes"] do
+    nets = raw["networks"]
+
+    if is_map(nets) do
+      Enum.reduce(nets, 0, fn {_iface, m}, acc ->
+        v = if is_map(m), do: Map.get(m, key) || 0, else: 0
+        acc + v
+      end)
+    else
+      0
+    end
+  end
 end
