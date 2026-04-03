@@ -142,7 +142,7 @@ defmodule Companion.LabCatalog do
       @c_src <> "\nEOF\ngcc -o /tmp/telvm_http /tmp/telvm.c && exec /tmp/telvm_http\n"
   ]
 
-  @catalog [
+  @hub_catalog [
     %{
       id: :lab_bun,
       label: "Node + Bun",
@@ -152,7 +152,9 @@ defmodule Companion.LabCatalog do
       use_image_cmd: false,
       container_cmd: @bun_cmd,
       source: :hub,
-      build_context: nil
+      build_context: nil,
+      telvm_certified: false,
+      container_env: []
     },
     %{
       id: :lab_go,
@@ -163,7 +165,9 @@ defmodule Companion.LabCatalog do
       use_image_cmd: false,
       container_cmd: @go_cmd,
       source: :hub,
-      build_context: nil
+      build_context: nil,
+      telvm_certified: false,
+      container_env: []
     },
     %{
       id: :lab_elixir,
@@ -174,7 +178,9 @@ defmodule Companion.LabCatalog do
       use_image_cmd: false,
       container_cmd: @elixir_cmd,
       source: :hub,
-      build_context: nil
+      build_context: nil,
+      telvm_certified: false,
+      container_env: []
     },
     %{
       id: :lab_python_uv,
@@ -185,7 +191,9 @@ defmodule Companion.LabCatalog do
       use_image_cmd: false,
       container_cmd: @python_uvicorn_cmd,
       source: :hub,
-      build_context: nil
+      build_context: nil,
+      telvm_certified: false,
+      container_env: []
     },
     %{
       id: :lab_c,
@@ -196,21 +204,110 @@ defmodule Companion.LabCatalog do
       use_image_cmd: false,
       container_cmd: @c_cmd,
       source: :hub,
-      build_context: nil
+      build_context: nil,
+      telvm_certified: false,
+      container_env: []
     }
   ]
 
-  def entries, do: @catalog
+  @doc """
+  Published certified stacks (`ghcr.io/<owner>/telvm-lab-*:main`). Override owner with
+  `TELVM_LAB_GHCR_ORG` (default `telvm-hq`) so local pulls match your registry.
+  """
+  def certified_entries do
+    org =
+      case System.get_env("TELVM_LAB_GHCR_ORG") do
+        nil -> "telvm-hq"
+        "" -> "telvm-hq"
+        o -> o |> String.trim() |> String.downcase()
+      end
+
+    prefix = "ghcr.io/#{org}/telvm-lab-"
+
+    [
+      %{
+        id: :cert_phoenix,
+        label: "Phoenix (certified)",
+        icon: "hero-sparkles",
+        ref: "#{prefix}phoenix:main",
+        probe_port: 3333,
+        use_image_cmd: true,
+        container_cmd: nil,
+        source: :ghcr,
+        build_context: nil,
+        telvm_certified: true,
+        container_env: []
+      },
+      %{
+        id: :cert_go,
+        label: "Go (certified)",
+        icon: "hero-bolt",
+        ref: "#{prefix}go:main",
+        probe_port: 3333,
+        use_image_cmd: true,
+        container_cmd: nil,
+        source: :ghcr,
+        build_context: nil,
+        telvm_certified: true,
+        container_env: []
+      },
+      %{
+        id: :cert_python,
+        label: "Python (certified)",
+        icon: "hero-command-line",
+        ref: "#{prefix}python:main",
+        probe_port: 3333,
+        use_image_cmd: true,
+        container_cmd: nil,
+        source: :ghcr,
+        build_context: nil,
+        telvm_certified: true,
+        container_env: []
+      },
+      %{
+        id: :cert_erlang,
+        label: "Erlang (certified)",
+        icon: "hero-bolt",
+        ref: "#{prefix}erlang:main",
+        probe_port: 3333,
+        use_image_cmd: true,
+        container_cmd: nil,
+        source: :ghcr,
+        build_context: nil,
+        telvm_certified: true,
+        container_env: []
+      },
+      %{
+        id: :cert_c,
+        label: "C (certified)",
+        icon: "hero-code-bracket",
+        ref: "#{prefix}c:main",
+        probe_port: 3333,
+        use_image_cmd: true,
+        container_cmd: nil,
+        source: :ghcr,
+        build_context: nil,
+        telvm_certified: true,
+        container_env: []
+      }
+    ]
+  end
+
+  def entries, do: certified_entries() ++ @hub_catalog
 
   def get(id) when is_atom(id) do
-    Enum.find(@catalog, &(&1.id == id))
+    Enum.find(entries(), &(&1.id == id))
   end
 
   @doc """
   Annotate catalog entries with `:available` boolean by matching each `ref`
   against `RepoTags` from `Docker.impl().image_list([])`.
   """
-  def with_availability(entries \\ @catalog) do
+  def with_availability(entries \\ :all)
+
+  def with_availability(:all), do: with_availability(entries())
+
+  def with_availability(entries) when is_list(entries) do
     local_tags =
       case Companion.Docker.impl().image_list([]) do
         {:ok, images} ->

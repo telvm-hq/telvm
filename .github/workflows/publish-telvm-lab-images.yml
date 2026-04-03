@@ -1,0 +1,58 @@
+name: Publish telvm certified lab images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "images/telvm-lab-*/**"
+      - ".github/workflows/publish-telvm-lab-images.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: phoenix
+            context: images/telvm-lab-phoenix
+            image: telvm-lab-phoenix
+          - name: go
+            context: images/telvm-lab-go
+            image: telvm-lab-go
+          - name: python
+            context: images/telvm-lab-python
+            image: telvm-lab-python
+          - name: erlang
+            context: images/telvm-lab-erlang
+            image: telvm-lab-erlang
+          - name: c
+            context: images/telvm-lab-c
+            image: telvm-lab-c
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set image name (lowercase owner for GHCR)
+        run: |
+          owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE=ghcr.io/${owner}/${{ matrix.image }}" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:main
+            ${{ env.IMAGE }}:${{ github.sha }}

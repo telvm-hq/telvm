@@ -55,11 +55,12 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ "destroy all lab"
     assert html =~ "byoi-image-ref"
     assert html =~ "image &amp; runtime"
+    assert html =~ "Phoenix (certified)"
     assert html =~ "Node + Bun"
     assert html =~ "Elixir + mix"
     assert html =~ "python + uv"
     assert html =~ "C + gcc"
-    assert html =~ "Extended soak (60s)"
+    assert html =~ "Certified soak (60s)"
     assert html =~ "mission console"
     refute html =~ "warm-machines-section"
     refute html =~ "id=\"lab-preview-frame\""
@@ -87,6 +88,14 @@ defmodule CompanionWeb.StatusLiveTest do
     assert conn.status == 200
     assert hd(get_resp_header(conn, "content-type")) =~ "text/markdown"
     assert conn.resp_body =~ "TELVM"
+  end
+
+  test "machines LiveView defines certified soak handler" do
+    path = Path.expand("../../../lib/companion_web/live/status_live.ex", __DIR__)
+    source = File.read!(path)
+
+    assert source =~ ~s(phx-click="certified_extended_soak")
+    assert source =~ "handle_event(\"certified_extended_soak\""
   end
 
   test "warm assets LiveView defines restart / pause / resume handlers" do

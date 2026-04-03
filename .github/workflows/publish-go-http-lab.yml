@@ -1,3 +1,4 @@
+# Legacy minimal probe image. Prefer telvm-lab-go (publish-telvm-lab-images.yml) for new GHCR use.
 name: Publish go-http-lab
 
 on:

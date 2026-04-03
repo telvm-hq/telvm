@@ -105,6 +105,16 @@ defmodule CompanionWeb.MachineControllerTest do
       assert json_response(conn, 201)
     end
 
+    test "creates a machine with env strings", %{conn: conn} do
+      body = %{
+        "image" => "node:22-alpine",
+        "env" => ["FOO=bar", %{"name" => "OTHER", "value" => "x"}]
+      }
+
+      conn = post(conn, "/telvm/api/machines", body)
+      assert json_response(conn, 201)
+    end
+
     test "returns machine with id and status fields", %{conn: conn} do
       conn = post(conn, "/telvm/api/machines", %{"image" => "node:22-alpine"})
       machine = json_response(conn, 201)["machine"]

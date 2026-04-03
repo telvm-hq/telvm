@@ -9,7 +9,7 @@ defmodule CompanionWeb.StatusLive do
   alias Companion.LabCatalog
   alias Companion.LabImageBuilder
 
-  @default_entry LabCatalog.get(:lab_bun)
+  @default_entry LabCatalog.get(:cert_phoenix)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -28,6 +28,7 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:selected_use_image_cmd, @default_entry.use_image_cmd)
       |> assign(:selected_container_cmd, @default_entry.container_cmd)
       |> assign(:selected_catalog_id, @default_entry.id)
+      |> assign(:selected_telvm_certified, Map.get(@default_entry, :telvm_certified, false))
       |> assign(:destroying, false)
       |> assign(:warm_machines, [])
       |> assign(:compose_stack_snapshot, {:ok, []})
@@ -307,14 +308,16 @@ defmodule CompanionWeb.StatusLive do
        |> assign(:selected_image, catalog_match.ref)
        |> assign(:selected_use_image_cmd, catalog_match.use_image_cmd)
        |> assign(:selected_container_cmd, catalog_match.container_cmd)
-       |> assign(:selected_catalog_id, catalog_match.id)}
+       |> assign(:selected_catalog_id, catalog_match.id)
+       |> assign(:selected_telvm_certified, Map.get(catalog_match, :telvm_certified, false))}
     else
       {:noreply,
        socket
        |> assign(:selected_image, ref)
        |> assign(:selected_use_image_cmd, true)
        |> assign(:selected_container_cmd, nil)
-       |> assign(:selected_catalog_id, nil)}
+       |> assign(:selected_catalog_id, nil)
+       |> assign(:selected_telvm_certified, false)}
     end
   end
 
@@ -409,15 +412,25 @@ defmodule CompanionWeb.StatusLive do
   end
 
   @impl true
-  def handle_event("start_extended_soak", _params, socket) do
+  def handle_event("certified_extended_soak", _params, socket) do
     ref = socket.assigns.selected_image
 
-    if ref == "" do
-      {:noreply, put_flash(socket, :error, "Enter an image reference first.")}
-    else
-      if socket.assigns.soak_busy do
+    cond do
+      ref == "" ->
+        {:noreply, put_flash(socket, :error, "Enter an image reference first.")}
+
+      socket.assigns.selected_telvm_certified != true ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Certified soak applies to GHCR catalog chips only — select a “(certified)” lab or paste a matching ref."
+         )}
+
+      socket.assigns.soak_busy ->
         {:noreply, put_flash(socket, :error, "A soak monitor is already in progress.")}
-      else
+
+      true ->
         overrides =
           socket
           |> lab_overrides_from_assigns()
@@ -431,7 +444,6 @@ defmodule CompanionWeb.StatusLive do
          |> assign(:verify_chain_active, false)
          |> assign(:lab_verify_pass, false)
          |> assign(vm_preflight_log: [], soak_busy: true)}
-      end
     end
   end
 
@@ -694,13 +706,28 @@ defmodule CompanionWeb.StatusLive do
   end
 
   defp lab_overrides_from_assigns(%{selected_image: ref} = assigns) do
+    entry =
+      case assigns[:selected_catalog_id] do
+        nil -> nil
+        id -> LabCatalog.get(id)
+      end
+
     overrides = [
       image: ref,
       use_image_default_cmd: assigns.selected_use_image_cmd
     ]
 
-    if assigns[:selected_container_cmd] do
-      Keyword.put(overrides, :container_cmd, assigns.selected_container_cmd)
+    overrides =
+      if assigns[:selected_container_cmd] do
+        Keyword.put(overrides, :container_cmd, assigns.selected_container_cmd)
+      else
+        overrides
+      end
+
+    env = entry && Map.get(entry, :container_env, [])
+
+    if is_list(env) and env != [] do
+      Keyword.put(overrides, :container_env, env)
     else
       overrides
     end
@@ -835,7 +862,7 @@ defmodule CompanionWeb.StatusLive do
         class="text-[11px] font-mono italic"
         style="color: var(--telvm-shell-muted);"
       >
-        No warm machines — run verify or extended soak on Machines, or leave a lab container up.
+        No warm machines — run verify or certified soak on Machines, or leave a lab container up.
       </div>
 
       <div :if={@warm_machines != []} class={["space-y-3", @scroll_class]}>
@@ -1303,22 +1330,29 @@ defmodule CompanionWeb.StatusLive do
               </button>
               <button
                 type="button"
-                phx-click="start_extended_soak"
-                disabled={@soak_busy or @vm_preflight_busy}
+                phx-click="certified_extended_soak"
+                disabled={@soak_busy or @vm_preflight_busy or not @selected_telvm_certified}
+                title={
+                  if(@selected_telvm_certified,
+                    do: "60s stability window for GHCR telvm-lab-* images",
+                    else: "Select a certified catalog chip (GHCR) first"
+                  )
+                }
                 class={[
                   "px-3 py-2 text-[10px] sm:text-xs font-mono font-semibold rounded-md border uppercase tracking-wide",
-                  (@soak_busy or @vm_preflight_busy) &&
+                  (@soak_busy or @vm_preflight_busy or not @selected_telvm_certified) &&
                     "cursor-not-allowed opacity-60 border-zinc-700",
-                  !(@soak_busy or @vm_preflight_busy) && "telvm-btn-secondary"
+                  !(@soak_busy or @vm_preflight_busy or not @selected_telvm_certified) &&
+                    "telvm-btn-secondary"
                 ]}
                 style={
-                  if(@soak_busy or @vm_preflight_busy,
+                  if(@soak_busy or @vm_preflight_busy or not @selected_telvm_certified,
                     do: "color: var(--telvm-shell-muted)",
                     else: nil
                   )
                 }
               >
-                Extended soak (60s)
+                Certified soak (60s)
               </button>
               <button
                 type="button"

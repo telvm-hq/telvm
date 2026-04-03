@@ -2,6 +2,8 @@
 
 Tiny `net/http` server for **VM manager pre-flight**: listens on **3333** (all interfaces), **`GET /` → 200**, body `ok`. Aligns with the five-image roadmap `go-http` row as a **probe-only** slice (no Claude CLI in this image).
 
+**Supersession:** the certified Go lab image is [`telvm-lab-go`](../telvm-lab-go/) (published as `ghcr.io/<owner>/telvm-lab-go:main`). Prefer that for new work; this tree remains until the legacy publish workflow is retired.
+
 ## Build locally
 
 ```bash
