@@ -39,9 +39,10 @@ The companion VM manager uses this for bind wait and soak stability probes again
 
 ## Companion: `LabCatalog` and certified soak
 
-- **Certified chips** point at GHCR refs (`Companion.LabCatalog.certified_entries/0`), use the image’s embedded **`CMD`** (`use_image_cmd: true`), and set **`telvm_certified: true`**.
+- **Machines catalog** lists only the five **GHCR certified** stacks (`Companion.LabCatalog.entries/0`); there are no Docker Hub preset chips. Use the **image ref / BYOI** field for any other image. Each chip includes **stack disclosure** (installed components, versions, runtime layout) and a **best-practice** note—shown in the UI even before `docker pull`, for operators and agents.
+- Chips use the image’s embedded **`CMD`** (`use_image_cmd: true`) and **`telvm_certified: true`**.
 - Override the registry owner with **`TELVM_LAB_GHCR_ORG`** (default **`telvm-hq`**) if your pulls use a different org/user name.
-- **Certified soak (60s)** on the Machines tab runs only when a **certified** catalog chip is selected (replacing the previous always-available extended soak).
+- **Certified soak (60s)** applies to those catalog selections (or paste a matching certified ref).
 
 ## Container `Env` (VmLifecycle and API)
 

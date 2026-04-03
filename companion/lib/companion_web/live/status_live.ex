@@ -28,6 +28,7 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:selected_use_image_cmd, @default_entry.use_image_cmd)
       |> assign(:selected_container_cmd, @default_entry.container_cmd)
       |> assign(:selected_catalog_id, @default_entry.id)
+      |> assign(:selected_catalog_entry, @default_entry)
       |> assign(:selected_telvm_certified, Map.get(@default_entry, :telvm_certified, false))
       |> assign(:destroying, false)
       |> assign(:warm_machines, [])
@@ -290,7 +291,9 @@ defmodule CompanionWeb.StatusLive do
        |> assign(:selected_image, entry.ref)
        |> assign(:selected_use_image_cmd, entry.use_image_cmd)
        |> assign(:selected_container_cmd, entry.container_cmd)
-       |> assign(:selected_catalog_id, entry.id)}
+       |> assign(:selected_catalog_id, entry.id)
+       |> assign(:selected_catalog_entry, entry)
+       |> assign(:selected_telvm_certified, Map.get(entry, :telvm_certified, false))}
     else
       {:noreply, socket}
     end
@@ -309,6 +312,7 @@ defmodule CompanionWeb.StatusLive do
        |> assign(:selected_use_image_cmd, catalog_match.use_image_cmd)
        |> assign(:selected_container_cmd, catalog_match.container_cmd)
        |> assign(:selected_catalog_id, catalog_match.id)
+       |> assign(:selected_catalog_entry, catalog_match)
        |> assign(:selected_telvm_certified, Map.get(catalog_match, :telvm_certified, false))}
     else
       {:noreply,
@@ -317,6 +321,7 @@ defmodule CompanionWeb.StatusLive do
        |> assign(:selected_use_image_cmd, true)
        |> assign(:selected_container_cmd, nil)
        |> assign(:selected_catalog_id, nil)
+       |> assign(:selected_catalog_entry, nil)
        |> assign(:selected_telvm_certified, false)}
     end
   end
@@ -432,7 +437,7 @@ defmodule CompanionWeb.StatusLive do
 
       true ->
         overrides =
-          socket
+          socket.assigns
           |> lab_overrides_from_assigns()
           |> Keyword.put(:soak_duration_ms, 60_000)
 
@@ -1136,29 +1141,31 @@ defmodule CompanionWeb.StatusLive do
         </div>
 
         <div
-          class="grid gap-2 mb-4 justify-start [grid-template-columns:repeat(auto-fill,100px)]"
+          class="grid gap-3 mb-4 justify-start [grid-template-columns:repeat(auto-fill,minmax(132px,1fr))]"
           id="lab-catalog-grid"
         >
-          <div :for={entry <- @lab_catalog} class="flex w-[100px] flex-col gap-1 shrink-0">
+          <div :for={entry <- @lab_catalog} class="flex max-w-[152px] flex-col gap-1.5 shrink-0">
             <button
               type="button"
               phx-click="select_image"
               phx-value-id={entry.id}
               class={[
-                "w-full min-h-[2.75rem] min-w-0 px-1.5 py-1.5 text-left rounded-md border text-[10px] font-medium transition-colors",
-                @selected_catalog_id == entry.id && "telvm-catalog-chip-on",
-                @selected_catalog_id != entry.id &&
-                  "border-zinc-700/80 bg-black/25 hover:border-zinc-600"
+                "w-full min-w-0 rounded-lg border text-left transition-all p-2 min-h-[5.25rem] flex flex-col items-stretch justify-center",
+                "bg-white border-zinc-300 shadow-[0_1px_3px_rgba(15,23,42,0.07)]",
+                "hover:border-zinc-400 hover:shadow-md hover:bg-zinc-50/90",
+                @selected_catalog_id == entry.id &&
+                  "ring-2 ring-[color-mix(in_oklch,var(--telvm-accent)_50%,transparent)] border-[color-mix(in_oklch,var(--telvm-accent)_38%,transparent)] bg-zinc-100 shadow-[0_2px_8px_rgba(15,23,42,0.12)]",
+                @selected_catalog_id != entry.id && "border-zinc-300"
               ]}
-              style={
-                if(@selected_catalog_id != entry.id, do: "color: var(--telvm-shell-muted)", else: nil)
-              }
             >
-              <span class="inline-flex items-center gap-1 min-w-0">
-                <.icon
-                  name={entry.icon}
-                  class="size-3.5 sm:size-4 shrink-0 opacity-90"
-                /> <span class="truncate leading-tight">{entry.label}</span>
+              <span class="block w-full rounded-md bg-white">
+                <img
+                  src={~p"/images/lab-stacks/#{entry.stack_card}"}
+                  alt={entry.label}
+                  class="w-full h-[4.25rem] object-contain object-center rounded-sm pointer-events-none select-none"
+                  loading="lazy"
+                  decoding="async"
+                />
               </span>
             </button>
             <button
@@ -1181,6 +1188,45 @@ defmodule CompanionWeb.StatusLive do
         >
           Pulling image…
         </p>
+
+        <section
+          :if={@selected_catalog_entry}
+          id="lab-stack-disclosure"
+          data-catalog-id={@selected_catalog_entry.id}
+          class="mb-5 max-w-3xl rounded-md border p-3 sm:p-4"
+          style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-panel-bg) 88%, white);"
+          aria-labelledby="lab-stack-disclosure-heading"
+        >
+          <h3
+            id="lab-stack-disclosure-heading"
+            class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.15em] font-semibold mb-2"
+          >
+            stack disclosure
+            <span class="font-mono normal-case opacity-80" style="color: var(--telvm-shell-muted);">
+              (local pull not required to read this)
+            </span>
+          </h3>
+          <p class="text-[10px] mb-2 leading-snug" style="color: var(--telvm-shell-muted);">
+            Key=value lines below are for humans and automation (agents); they summarize what this certified image contains and why it matches common production practice for the language.
+          </p>
+          <div
+            class="rounded border p-2 mb-3 font-mono text-[10px] sm:text-[11px] leading-relaxed whitespace-pre-wrap overflow-x-auto"
+            style="border-color: color-mix(in oklch, var(--telvm-shell-border) 85%, transparent); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+            role="region"
+            aria-label="Installed components and versions"
+          >
+            {@selected_catalog_entry.stack_disclosure}
+          </div>
+          <h4 class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] font-semibold mb-1.5">
+            why this shape (best practice)
+          </h4>
+          <p
+            class="text-[11px] sm:text-xs leading-relaxed max-w-prose"
+            style="color: var(--telvm-shell-muted);"
+          >
+            {@selected_catalog_entry.best_practice}
+          </p>
+        </section>
 
         <div class="max-w-2xl">
           <label

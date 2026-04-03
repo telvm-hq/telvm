@@ -4,10 +4,10 @@ defmodule Companion.LabCatalogTest do
   alias Companion.LabCatalog
 
   describe "entries/0" do
-    test "returns hub + certified catalog entries" do
+    test "returns five certified GHCR catalog entries only" do
       entries = LabCatalog.entries()
       assert is_list(entries)
-      assert length(entries) == 10
+      assert length(entries) == 5
 
       for entry <- entries do
         assert is_atom(entry.id)
@@ -15,16 +15,16 @@ defmodule Companion.LabCatalogTest do
         assert is_binary(entry.ref)
         assert is_integer(entry.probe_port)
         assert is_boolean(entry.use_image_cmd)
-        assert entry.source in [:hub, :ghcr]
+        assert entry.source == :ghcr
         assert Map.has_key?(entry, :container_cmd)
         assert is_boolean(entry.telvm_certified)
+        assert entry.telvm_certified == true
         assert is_list(entry.container_env)
-      end
-    end
-
-    test "all inline-cmd entries have a non-nil container_cmd list" do
-      for entry <- LabCatalog.entries(), entry.use_image_cmd == false do
-        assert is_list(entry.container_cmd), "#{entry.id} should have a container_cmd list"
+        assert is_binary(entry.stack_card)
+        assert is_binary(entry.stack_disclosure)
+        assert String.contains?(entry.stack_disclosure, "probe:")
+        assert is_binary(entry.best_practice)
+        assert String.length(entry.best_practice) > 20
       end
     end
 
@@ -43,47 +43,22 @@ defmodule Companion.LabCatalogTest do
         assert entry.ref =~ "ghcr.io/"
         assert entry.ref =~ "telvm-lab-"
         assert entry.ref =~ ":main"
+        assert entry.stack_card =~ "_stack.png"
       end
     end
   end
 
   describe "get/1" do
-    test "returns the lab_bun entry" do
-      entry = LabCatalog.get(:lab_bun)
-      assert entry.id == :lab_bun
-      assert entry.ref == "oven/bun:1-alpine"
-      assert entry.use_image_cmd == false
-      assert is_list(entry.container_cmd)
-    end
-
-    test "returns the lab_go entry" do
-      entry = LabCatalog.get(:lab_go)
-      assert entry.id == :lab_go
-      assert entry.ref == "golang:1.23-alpine"
-      assert entry.use_image_cmd == false
-      assert is_list(entry.container_cmd)
-    end
-
-    test "returns the lab_python_uv entry" do
-      entry = LabCatalog.get(:lab_python_uv)
-      assert entry.id == :lab_python_uv
-      assert entry.ref == "python:3.12-slim-bookworm"
-      assert is_list(entry.container_cmd)
-    end
-
-    test "returns the lab_elixir entry" do
-      entry = LabCatalog.get(:lab_elixir)
-      assert entry.id == :lab_elixir
-      assert entry.ref == "elixir:1.18-alpine"
-    end
-
-    test "returns the lab_c entry" do
-      entry = LabCatalog.get(:lab_c)
-      assert entry.id == :lab_c
-      assert entry.ref == "gcc:14-bookworm"
+    test "returns the cert_phoenix entry" do
+      entry = LabCatalog.get(:cert_phoenix)
+      assert entry.id == :cert_phoenix
+      assert entry.ref =~ "telvm-lab-phoenix"
+      assert entry.use_image_cmd == true
+      assert is_nil(entry.container_cmd)
     end
 
     test "returns nil for unknown id" do
+      assert is_nil(LabCatalog.get(:lab_bun))
       assert is_nil(LabCatalog.get(:unknown_image))
     end
   end
