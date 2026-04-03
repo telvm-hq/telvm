@@ -11,5 +11,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: MCP package (Node)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
+
+      - name: MCP — test and build
+        working-directory: mcp
+        run: |
+          npm ci
+          npm test
+          npm run build
+
       - name: Run ExUnit via Docker Compose
         run: docker compose --profile test run --rm companion_test

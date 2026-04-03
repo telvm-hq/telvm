@@ -4,6 +4,10 @@ Base URL (default dev): **`http://localhost:4000/telvm/api`**
 
 The companion exposes a **thin HTTP layer** over Docker Engine for **machines** (labeled lab containers): list, create, exec, delete, plus a **live event stream**. Use it from **Cursor**, other agent runtimes, **`curl`**, or any HTTP client. telvm does **not** bundle an LLM.
 
+## Model Context Protocol (MCP)
+
+The repository includes a **reference MCP server** ([`mcp/`](../mcp/)) that exposes the same operations as **tools** (stdio → HTTP to this API). It adds **no** duplicate business logic in Phoenix — only HTTP forwarding. Setup for **Cursor**: [mcp-cursor.md](mcp-cursor.md).
+
 ## Security and scope (v0.1.0)
 
 - **No authentication** — intended for **local** use with **trusted networks** only.
@@ -44,6 +48,7 @@ Keepalive comments are sent on idle (see implementation in [`machine_controller.
 
 ## See also
 
+- [MCP + Cursor](mcp-cursor.md) — configure the telvm MCP server for IDE agents.
 - [Plumbing](plumbing.md) — PubSub, operator UI vs SSE, `machines_snapshot` vs Docker pull.
 - [Quick start](quickstart.md) — run Compose, operator UI, tests.
 - [Architecture](ARCHITECTURE.md) — ProxyPlug, router order, Docker adapter, tests.
