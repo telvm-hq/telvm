@@ -8,8 +8,13 @@ defmodule CompanionWeb.StatusLive do
   alias Companion.VmLifecycle.SoakRunner
   alias Companion.LabCatalog
   alias Companion.LabImageBuilder
+  alias Companion.InferencePreflight
+  alias Companion.InferenceChat
+  alias Companion.GooseRuntime
+  alias Companion.GooseHealth
 
   @default_entry LabCatalog.get(:cert_phoenix)
+  @agent_chat_max_messages 40
 
   @impl true
   def mount(_params, _session, socket) do
@@ -50,12 +55,37 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:verify_last_error, nil)
       |> assign(:verify_chain_active, false)
       |> assign(:lab_verify_pass, false)
+      |> assign(:inference_base_url, inference_base_url_default())
+      |> assign(:inference_api_key, "")
+      |> assign(:inference_check_busy, false)
+      |> assign(:inference_check_result, nil)
+      |> assign(:inference_model_ids, [])
+      |> assign(:agent_chat_session, :idle)
+      |> assign(:agent_chat_model, nil)
+      |> assign(:agent_chat_messages, [])
+      |> assign(:agent_chat_busy, false)
+      |> assign(:agent_chat_error, nil)
+      |> assign(:agent_chat_tab, :goose)
+      |> assign(:goose_chat_messages, [])
+      |> assign(:goose_chat_busy, false)
+      |> assign(:goose_chat_error, nil)
+      |> assign(:goose_container_id, nil)
+      |> assign(:goose_status, nil)
+      |> assign(:goose_logs_text, nil)
+      |> assign(:goose_logs_loading, false)
+      |> assign(:goose_logs_error, nil)
+      |> assign(:goose_health_snapshot, nil)
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Companion.PubSub, Preflight.topic())
       Phoenix.PubSub.subscribe(Companion.PubSub, VmLifecycle.topic())
       Phoenix.PubSub.subscribe(Companion.PubSub, LabImageBuilder.topic())
       Phoenix.PubSub.subscribe(Companion.PubSub, SoakRunner.topic())
+      Phoenix.PubSub.subscribe(Companion.PubSub, GooseHealth.topic())
+
+      if socket.assigns.live_action == :agent_setup do
+        send(self(), :load_goose_panel)
+      end
     end
 
     {:ok, socket}
@@ -86,6 +116,17 @@ defmodule CompanionWeb.StatusLive do
         if connected?(socket), do: schedule_warm_refresh()
         {:noreply, socket}
 
+      :agent_setup ->
+        socket = assign(socket, :page_title, page_title(socket))
+
+        if connected?(socket) do
+          send(self(), :load_goose_panel)
+          send(self(), :auto_connect_inference)
+          GooseHealth.refresh()
+        end
+
+        {:noreply, socket}
+
       _ ->
         {:noreply, assign(socket, :page_title, page_title(socket))}
     end
@@ -95,7 +136,33 @@ defmodule CompanionWeb.StatusLive do
     case socket.assigns[:live_action] do
       :machines -> "Machines"
       :warm_assets -> "Warm assets"
+      :agent_setup -> "Agent setup"
       _ -> "Pre-flight"
+    end
+  end
+
+  defp inference_base_url_default do
+    Application.get_env(:companion, :inference_base_url) ||
+      Application.get_env(:companion, :default_inference_base_url) ||
+      "http://host.docker.internal:11434/v1"
+  end
+
+  defp agent_default_model_name do
+    Application.get_env(:companion, :agent_default_model) || "qwen2.5:0.5b"
+  end
+
+  defp pick_auto_chat_model(ids) when is_list(ids) do
+    pref = agent_default_model_name() |> to_string() |> String.trim()
+
+    cond do
+      ids == [] ->
+        nil
+
+      pref != "" and pref in ids ->
+        pref
+
+      true ->
+        Enum.find(ids, &String.contains?(&1, "qwen")) || List.first(ids)
     end
   end
 
@@ -274,6 +341,135 @@ defmodule CompanionWeb.StatusLive do
     end
   end
 
+  def handle_info(:load_goose_panel, socket) do
+    if socket.assigns.live_action == :agent_setup do
+      {:noreply, load_goose_panel(socket)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info(:auto_connect_inference, socket) do
+    if socket.assigns.live_action != :agent_setup do
+      {:noreply, socket}
+    else
+      base = socket.assigns.inference_base_url |> to_string() |> String.trim()
+      key = socket.assigns.inference_api_key |> to_string()
+
+      cond do
+        base == "" ->
+          {:noreply, socket}
+
+        socket.assigns.inference_check_busy ->
+          {:noreply, socket}
+
+        true ->
+          socket = assign(socket, :inference_check_busy, true)
+
+          case InferencePreflight.check_models(base, api_key: key) do
+            {:ok, meta} ->
+              ids = Map.get(meta, :model_ids, [])
+
+              socket =
+                socket
+                |> assign(:inference_check_busy, false)
+                |> assign(:inference_check_result, {:ok, meta})
+                |> assign(:inference_model_ids, ids)
+
+              socket =
+                if socket.assigns.agent_chat_session == :idle and ids != [] do
+                  case pick_auto_chat_model(ids) do
+                    nil ->
+                      socket
+
+                    model ->
+                      socket
+                      |> assign(:agent_chat_session, :active)
+                      |> assign(:agent_chat_model, model)
+                      |> assign(:agent_chat_messages, [])
+                      |> assign(:agent_chat_error, nil)
+                  end
+                else
+                  socket
+                end
+
+              {:noreply, socket}
+
+            {:error, msg} when is_binary(msg) ->
+              {:noreply,
+               socket
+               |> assign(:inference_check_busy, false)
+               |> assign(:inference_check_result, {:error, msg})
+               |> assign(:inference_model_ids, [])}
+          end
+      end
+    end
+  end
+
+  def handle_info({:goose_health, snap}, socket) do
+    if socket.assigns.live_action == :agent_setup do
+      {:noreply, assign(socket, :goose_health_snapshot, snap)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:goose_chat_done, result}, socket) do
+    if socket.assigns.live_action != :agent_setup do
+      {:noreply, socket}
+    else
+      case result do
+        {:ok, text} ->
+          msgs =
+            socket.assigns.goose_chat_messages ++ [%{"role" => "assistant", "content" => text}]
+
+          msgs = trim_chat_messages(msgs, @agent_chat_max_messages)
+
+          {:noreply,
+           socket
+           |> assign(:goose_chat_messages, msgs)
+           |> assign(:goose_chat_busy, false)
+           |> assign(:goose_chat_error, nil)}
+
+        {:error, msg} when is_binary(msg) ->
+          {:noreply,
+           socket
+           |> assign(:goose_chat_busy, false)
+           |> assign(:goose_chat_error, msg)}
+      end
+    end
+  end
+
+  def handle_info({:agent_chat_done, result}, socket) do
+    cond do
+      socket.assigns.live_action != :agent_setup ->
+        {:noreply, socket}
+
+      socket.assigns.agent_chat_session != :active ->
+        {:noreply, socket}
+
+      true ->
+        case result do
+          {:ok, text} when is_binary(text) ->
+            prev = socket.assigns.agent_chat_messages
+            full = prev ++ [%{"role" => "assistant", "content" => text}]
+            full = trim_chat_messages(full, @agent_chat_max_messages)
+
+            {:noreply,
+             socket
+             |> assign(:agent_chat_messages, full)
+             |> assign(:agent_chat_busy, false)
+             |> assign(:agent_chat_error, nil)}
+
+          {:error, msg} when is_binary(msg) ->
+            {:noreply,
+             socket
+             |> assign(:agent_chat_busy, false)
+             |> assign(:agent_chat_error, msg)}
+        end
+    end
+  end
+
   # --- Events: select image from catalog ---
 
   @impl true
@@ -352,6 +548,192 @@ defmodule CompanionWeb.StatusLive do
   end
 
   # --- Events: pull image from registry ---
+
+  @impl true
+  def handle_event("test_inference_endpoint", params, socket) do
+    base = params |> Map.get("inference_base_url", "") |> to_string() |> String.trim()
+    key = params |> Map.get("inference_api_key", "") |> to_string()
+
+    socket =
+      socket
+      |> assign(:inference_base_url, base)
+      |> assign(:inference_api_key, key)
+
+    cond do
+      base == "" ->
+        {:noreply, assign(socket, :inference_check_result, {:error, "Enter a base URL."})}
+
+      socket.assigns.inference_check_busy ->
+        {:noreply, socket}
+
+      true ->
+        socket = assign(socket, :inference_check_busy, true)
+
+        case InferencePreflight.check_models(base, api_key: key) do
+          {:ok, meta} ->
+            ids = Map.get(meta, :model_ids, [])
+
+            {:noreply,
+             socket
+             |> assign(:inference_check_busy, false)
+             |> assign(:inference_check_result, {:ok, meta})
+             |> assign(:inference_model_ids, ids)}
+
+          {:error, msg} when is_binary(msg) ->
+            {:noreply,
+             socket
+             |> assign(:inference_check_busy, false)
+             |> assign(:inference_check_result, {:error, msg})
+             |> assign(:inference_model_ids, [])}
+        end
+    end
+  end
+
+  @impl true
+  def handle_event("start_agent_chat", params, socket) do
+    model = params |> Map.get("model", "") |> to_string() |> String.trim()
+
+    cond do
+      socket.assigns.agent_chat_session == :active ->
+        {:noreply, socket}
+
+      model == "" ->
+        {:noreply, assign(socket, :agent_chat_error, "Choose or enter a model name.")}
+
+      true ->
+        {:noreply,
+         socket
+         |> assign(:agent_chat_session, :active)
+         |> assign(:agent_chat_model, model)
+         |> assign(:agent_chat_messages, [])
+         |> assign(:agent_chat_error, nil)}
+    end
+  end
+
+  @impl true
+  def handle_event("send_agent_chat", params, socket) do
+    content = params |> Map.get("content", "") |> to_string() |> String.trim()
+
+    cond do
+      socket.assigns.agent_chat_session != :active ->
+        {:noreply, socket}
+
+      socket.assigns.agent_chat_busy ->
+        {:noreply, socket}
+
+      content == "" ->
+        {:noreply, socket}
+
+      true ->
+        base = socket.assigns.inference_base_url
+        key = socket.assigns.inference_api_key
+        locked = socket.assigns.agent_chat_model
+
+        prev = socket.assigns.agent_chat_messages
+        user_msgs = prev ++ [%{"role" => "user", "content" => content}]
+        user_msgs = trim_chat_messages(user_msgs, @agent_chat_max_messages)
+
+        parent = self()
+
+        Task.start(fn ->
+          result =
+            try do
+              InferenceChat.chat_completion(base, key, locked, user_msgs)
+            rescue
+              e -> {:error, Exception.message(e)}
+            end
+
+          send(parent, {:agent_chat_done, result})
+        end)
+
+        {:noreply,
+         socket
+         |> assign(:agent_chat_busy, true)
+         |> assign(:agent_chat_error, nil)
+         |> assign(:agent_chat_messages, user_msgs)}
+    end
+  end
+
+  @impl true
+  def handle_event("end_agent_chat", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:agent_chat_session, :idle)
+     |> assign(:agent_chat_model, nil)
+     |> assign(:agent_chat_messages, [])
+     |> assign(:agent_chat_error, nil)
+     |> assign(:agent_chat_busy, false)}
+  end
+
+  @impl true
+  def handle_event("set_agent_chat_tab", %{"tab" => tab}, socket)
+      when tab in ["model", "goose"] do
+    tab_atom =
+      case tab do
+        "goose" -> :goose
+        _ -> :model
+      end
+
+    {:noreply, assign(socket, :agent_chat_tab, tab_atom)}
+  end
+
+  @impl true
+  def handle_event("send_goose_chat", params, socket) do
+    content = params |> Map.get("content", "") |> to_string() |> String.trim()
+
+    cond do
+      socket.assigns.live_action != :agent_setup ->
+        {:noreply, socket}
+
+      socket.assigns.goose_chat_busy ->
+        {:noreply, socket}
+
+      content == "" ->
+        {:noreply, socket}
+
+      is_nil(socket.assigns.goose_container_id) ->
+        {:noreply,
+         assign(
+           socket,
+           :goose_chat_error,
+           "The Goose agent isn’t available yet. Add the goose service to Docker Compose, run the stack, then refresh this page."
+         )}
+
+      true ->
+        cid = socket.assigns.goose_container_id
+
+        msgs =
+          trim_chat_messages(
+            socket.assigns.goose_chat_messages ++ [%{"role" => "user", "content" => content}],
+            @agent_chat_max_messages
+          )
+
+        parent = self()
+
+        Task.start(fn ->
+          result = GooseRuntime.run_text(cid, content)
+          send(parent, {:goose_chat_done, result})
+        end)
+
+        {:noreply,
+         socket
+         |> assign(:goose_chat_messages, msgs)
+         |> assign(:goose_chat_busy, true)
+         |> assign(:goose_chat_error, nil)}
+    end
+  end
+
+  @impl true
+  def handle_event("clear_goose_chat", _params, socket) do
+    if socket.assigns.live_action == :agent_setup do
+      {:noreply,
+       socket
+       |> assign(:goose_chat_messages, [])
+       |> assign(:goose_chat_error, nil)}
+    else
+      {:noreply, socket}
+    end
+  end
 
   @impl true
   def handle_event("pull_image", %{"id" => id_str}, socket) do
@@ -527,6 +909,67 @@ defmodule CompanionWeb.StatusLive do
            |> assign(:warm_logs_loading, false)
            |> assign(:warm_logs_error, inspect(reason))}
       end
+    end
+  end
+
+  @impl true
+  def handle_event("refresh_goose_logs", _params, socket) do
+    id = socket.assigns[:goose_container_id]
+    tail = 200
+
+    cond do
+      socket.assigns.live_action != :agent_setup ->
+        {:noreply, socket}
+
+      is_nil(id) ->
+        {:noreply, socket}
+
+      true ->
+        socket =
+          socket
+          |> assign(:goose_logs_loading, true)
+          |> assign(:goose_logs_error, nil)
+
+        case GooseRuntime.logs(id, tail: tail) do
+          {:ok, text} ->
+            {:noreply,
+             socket
+             |> assign(:goose_logs_loading, false)
+             |> assign(:goose_logs_text, goose_logs_with_preamble(id, text, :refresh))}
+
+          {:error, reason} ->
+            {:noreply,
+             socket
+             |> assign(:goose_logs_loading, false)
+             |> assign(:goose_logs_error, inspect(reason))}
+        end
+    end
+  end
+
+  @impl true
+  def handle_event("restart_goose_container", _params, socket) do
+    id = socket.assigns[:goose_container_id]
+
+    cond do
+      socket.assigns.live_action != :agent_setup ->
+        {:noreply, socket}
+
+      is_nil(id) ->
+        {:noreply, put_flash(socket, :error, "Goose container not found.")}
+
+      true ->
+        case GooseRuntime.restart_container(id) do
+          :ok ->
+            socket =
+              socket
+              |> put_flash(:info, "Restarting Goose container #{String.slice(id, 0, 12)}…")
+              |> load_goose_panel()
+
+            {:noreply, socket}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Goose restart failed: #{inspect(reason)}")}
+        end
     end
   end
 
@@ -773,6 +1216,9 @@ defmodule CompanionWeb.StatusLive do
       :warm_assets ->
         warm_assets(assigns)
 
+      :agent_setup ->
+        agent_setup(assigns)
+
       action
       when action in [
              :legacy_certificate_redirect,
@@ -786,6 +1232,514 @@ defmodule CompanionWeb.StatusLive do
       _ ->
         preflight(assigns)
     end
+  end
+
+  # --- Agent setup tab ---
+
+  defp agent_setup(assigns) do
+    ~H"""
+    <div class="telvm-terminal telvm-console-shell px-3 py-3 sm:px-4 sm:py-4">
+      <.terminal_nav active={@live_action} />
+      <div class="flex flex-wrap items-end justify-between gap-2 telvm-accent-border-b border-b pb-2 mb-4">
+        <div class="text-[11px] sm:text-xs uppercase tracking-[0.2em] telvm-accent-text font-semibold">
+          telvm · agent setup
+        </div>
+      </div>
+
+      <p
+        class="telvm-prose-bar text-[11px] mb-5 font-mono leading-relaxed max-w-2xl border-l-2 pl-2"
+        style="color: var(--telvm-shell-muted);"
+      >
+        Ollama is probed when you open this tab; the
+        <span class="telvm-accent-dim-text">Goose agent</span>
+        tab is the default. The <span class="telvm-accent-dim-text">Model</span>
+        tab starts a direct chat when models are listed (default model from <span class="font-mono telvm-accent-dim-text">TELVM_AGENT_DEFAULT_MODEL</span>).
+        Weights live in your inference server, not in Phoenix.
+      </p>
+
+      <div class="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
+        <div class="min-w-0 space-y-5 max-w-xl">
+          <section
+            class="rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4"
+            id="agent-inference-preflight"
+          >
+            <form phx-submit="test_inference_endpoint" class="space-y-3">
+              <div>
+                <label
+                  for="inference-base-url"
+                  class="block telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] mb-1 font-semibold"
+                >
+                  OpenAI base URL
+                </label>
+                <input
+                  type="text"
+                  name="inference_base_url"
+                  id="inference-base-url"
+                  value={@inference_base_url}
+                  autocomplete="off"
+                  placeholder="http://host.docker.internal:11434/v1"
+                  disabled={@inference_check_busy}
+                  class="w-full px-2 py-2 text-xs font-mono border rounded-md telvm-accent-ring disabled:opacity-50"
+                  style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+                />
+                <p class="text-[10px] mt-1" style="color: var(--telvm-shell-muted);">
+                  Include <span class="font-mono telvm-accent-dim-text">/v1</span>
+                  (or host only — /v1 is appended if missing). From Compose use
+                  <span class="font-mono telvm-accent-dim-text">http://ollama:11434/v1</span>
+                  when the inference service shares the stack network.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  for="inference-api-key"
+                  class="block telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] mb-1 font-semibold"
+                >
+                  API key (optional)
+                </label>
+                <input
+                  type="password"
+                  name="inference_api_key"
+                  id="inference-api-key"
+                  value={@inference_api_key}
+                  autocomplete="off"
+                  placeholder="Bearer token if required"
+                  disabled={@inference_check_busy}
+                  class="w-full px-2 py-2 text-xs font-mono border rounded-md telvm-accent-ring disabled:opacity-50"
+                  style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={@inference_check_busy}
+                class={[
+                  "px-3 py-2 text-[10px] sm:text-xs font-mono font-semibold rounded-md border uppercase tracking-wide",
+                  @inference_check_busy && "cursor-not-allowed opacity-60 border-zinc-700",
+                  !@inference_check_busy && "telvm-btn-primary"
+                ]}
+              >
+                {if @inference_check_busy, do: "Refreshing…", else: "Refresh models"}
+              </button>
+            </form>
+
+            <div :if={@inference_check_result != nil} class="mt-4 text-[11px] font-mono space-y-1">
+              <%= case @inference_check_result do %>
+                <% {:ok, meta} -> %>
+                  <p class="telvm-text-ok font-medium">OK — models listed.</p>
+
+                  <p style="color: var(--telvm-shell-muted);">Count: {meta.model_count}</p>
+
+                  <p
+                    :if={meta.sample_ids != []}
+                    class="break-all"
+                    style="color: var(--telvm-shell-muted);"
+                  >
+                    Sample: {Enum.join(meta.sample_ids, ", ")}
+                  </p>
+                <% {:error, msg} -> %>
+                  <p class="telvm-text-danger-ink whitespace-pre-wrap">{msg}</p>
+              <% end %>
+            </div>
+          </section>
+
+          <aside
+            class="min-w-0 rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4"
+            id="agent-goose-panel"
+          >
+            <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] mb-2 font-semibold">
+              Agent runtime · diagnostics
+            </div>
+            <p class="text-[10px] mb-3" style="color: var(--telvm-shell-muted);">
+              Optional: container state and log tail for operators. The Model / Goose chat panel is on the right on wide screens; use a full TTY for
+              <span class="font-mono">goose session</span>
+              when you need the interactive REPL.
+            </p>
+            <div class="text-[11px] font-mono space-y-1 mb-3">
+              <p>
+                <span class="telvm-accent-dim-text text-[10px] uppercase mr-1">container</span>
+                {goose_panel_container_display(@goose_container_id)}
+              </p>
+              <p>
+                <span class="telvm-accent-dim-text text-[10px] uppercase mr-1">state</span>
+                {@goose_status || "—"}
+              </p>
+            </div>
+            <p class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] mb-1 font-semibold">
+              Exec (from repo root)
+            </p>
+            <pre
+              class="text-[10px] font-mono whitespace-pre-wrap break-all p-2 rounded border mb-3"
+              style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-input-bg) 88%, black); color: var(--telvm-shell-fg);"
+            >docker compose exec -it goose goose session</pre>
+            <div class="flex flex-wrap gap-2 mb-3">
+              <button
+                type="button"
+                phx-click="refresh_goose_logs"
+                phx-disable-with="refreshing…"
+                disabled={@goose_container_id == nil}
+                class={[
+                  "px-2 py-1 text-[10px] font-mono rounded-md border uppercase tracking-wide",
+                  @goose_container_id == nil && "cursor-not-allowed opacity-50 border-zinc-700",
+                  @goose_container_id != nil && "telvm-btn-secondary"
+                ]}
+              >
+                Refresh logs
+              </button>
+              <button
+                :if={@goose_container_id != nil}
+                type="button"
+                phx-click="restart_goose_container"
+                phx-disable-with="restarting…"
+                class="px-2 py-1 text-[10px] font-mono rounded-md border uppercase tracking-wide telvm-btn-warn"
+              >
+                Restart
+              </button>
+            </div>
+            <div class="text-[10px] mb-1 telvm-accent-dim-text uppercase tracking-wide">
+              Engine logs (tail)
+            </div>
+            <code
+              :if={@goose_logs_loading}
+              class="block text-[10px] font-mono"
+              style="color: var(--telvm-shell-muted);"
+            >
+              Loading…
+            </code>
+            <code
+              :if={!@goose_logs_loading && @goose_logs_error}
+              class="block text-[10px] font-mono text-red-400/90 whitespace-pre-wrap"
+            >
+              {@goose_logs_error}
+            </code>
+            <pre
+              :if={!@goose_logs_loading && !@goose_logs_error}
+              class="max-h-48 overflow-y-auto rounded border p-2 text-[10px] font-mono whitespace-pre-wrap break-words"
+              style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-input-bg) 92%, black); color: var(--telvm-shell-fg);"
+            >{@goose_logs_text || ""}</pre>
+          </aside>
+
+          <section class="text-[10px] leading-relaxed" style="color: var(--telvm-shell-muted);">
+            <span class="telvm-accent-dim-text font-semibold uppercase tracking-[0.12em]">
+              Weights
+            </span>
+            — Stored by your inference runtime (e.g. Ollama) in a Docker volume or host path; add an
+            <span class="font-mono">ollama</span>
+            Compose service when ready. Not loaded inside the Phoenix app.
+          </section>
+        </div>
+
+        <div class="min-w-0">
+          <section
+            class="rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4 lg:sticky lg:top-4"
+            id="agent-chat-panel"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] font-semibold">
+                Chat
+              </div>
+              <div
+                class="inline-flex rounded border text-[10px] font-mono overflow-hidden"
+                style="border-color: var(--telvm-shell-border);"
+                role="tablist"
+              >
+                <button
+                  type="button"
+                  phx-click="set_agent_chat_tab"
+                  phx-value-tab="model"
+                  role="tab"
+                  aria-selected={@agent_chat_tab == :model}
+                  class={agent_chat_tab_btn_class(@agent_chat_tab == :model)}
+                >
+                  Model
+                </button>
+                <button
+                  type="button"
+                  phx-click="set_agent_chat_tab"
+                  phx-value-tab="goose"
+                  role="tab"
+                  aria-selected={@agent_chat_tab == :goose}
+                  class={agent_chat_tab_btn_class(@agent_chat_tab == :goose)}
+                >
+                  Goose agent
+                </button>
+              </div>
+            </div>
+
+            <div class={["space-y-3", @agent_chat_tab != :model && "hidden"]}>
+              <p class="text-[10px]" style="color: var(--telvm-shell-muted);">
+                Direct OpenAI-style completions. One session at a time — end the session to switch models. Transcript is ephemeral.
+              </p>
+
+              <div :if={@agent_chat_session == :idle} class="space-y-2">
+                <form phx-submit="start_agent_chat" class="space-y-2">
+                  <div :if={@inference_model_ids != []}>
+                    <label
+                      for="agent-chat-model-select"
+                      class="block telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] mb-1 font-semibold"
+                    >
+                      Model
+                    </label>
+                    <select
+                      name="model"
+                      id="agent-chat-model-select"
+                      class="w-full px-2 py-2 text-xs font-mono border rounded-md telvm-accent-ring"
+                      style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+                    >
+                      <option value="" disabled selected class="text-zinc-500">
+                        — pick after Refresh models —
+                      </option>
+                      <option :for={id <- @inference_model_ids} value={id}>{id}</option>
+                    </select>
+                  </div>
+
+                  <div :if={@inference_model_ids == []}>
+                    <label
+                      for="agent-chat-model-text"
+                      class="block telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] mb-1 font-semibold"
+                    >
+                      Model name
+                    </label>
+                    <input
+                      type="text"
+                      name="model"
+                      id="agent-chat-model-text"
+                      autocomplete="off"
+                      placeholder="e.g. tinyllama"
+                      class="w-full px-2 py-2 text-xs font-mono border rounded-md telvm-accent-ring"
+                      style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+                    />
+                    <p class="text-[10px] mt-1" style="color: var(--telvm-shell-muted);">
+                      Run <span class="font-mono telvm-accent-dim-text">Refresh models</span>
+                      to fill the list, or type a model id from your server.
+                    </p>
+                  </div>
+
+                  <p
+                    :if={@agent_chat_error != nil && @agent_chat_session == :idle}
+                    class="text-[11px] telvm-text-danger-ink"
+                  >
+                    {@agent_chat_error}
+                  </p>
+
+                  <button
+                    type="submit"
+                    class="px-3 py-2 text-[10px] sm:text-xs font-mono font-semibold rounded-md border uppercase tracking-wide telvm-btn-secondary"
+                  >
+                    Start session
+                  </button>
+                </form>
+              </div>
+
+              <div :if={@agent_chat_session == :active} class="space-y-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-[11px] font-mono" style="color: var(--telvm-shell-fg);">
+                    <span class="telvm-accent-dim-text text-[10px] uppercase mr-1">model</span>
+                    {@agent_chat_model}
+                  </p>
+                  <button
+                    type="button"
+                    phx-click="end_agent_chat"
+                    class="px-2 py-1 text-[10px] font-mono rounded-md border uppercase tracking-wide telvm-btn-warn"
+                  >
+                    End session
+                  </button>
+                </div>
+
+                <pre
+                  class="max-h-48 overflow-y-auto rounded border p-2 text-[11px] font-mono whitespace-pre-wrap break-words"
+                  style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-input-bg) 92%, black); color: var(--telvm-shell-fg);"
+                ><%= agent_chat_transcript(@agent_chat_messages) %></pre>
+
+                <div
+                  :if={@agent_chat_busy}
+                  class="text-[10px] telvm-accent-dim-text animate-pulse"
+                >
+                  Model is replying…
+                </div>
+
+                <p
+                  :if={@agent_chat_error != nil}
+                  class="text-[11px] telvm-text-danger-ink whitespace-pre-wrap"
+                >
+                  {@agent_chat_error}
+                </p>
+
+                <form phx-submit="send_agent_chat" class="space-y-2">
+                  <textarea
+                    name="content"
+                    rows="3"
+                    placeholder="Message…"
+                    disabled={@agent_chat_busy}
+                    class="w-full px-2 py-2 text-xs font-mono border rounded-md telvm-accent-ring disabled:opacity-50"
+                    style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+                  ></textarea>
+                  <button
+                    type="submit"
+                    disabled={@agent_chat_busy}
+                    class={[
+                      "px-3 py-2 text-[10px] sm:text-xs font-mono font-semibold rounded-md border uppercase tracking-wide",
+                      @agent_chat_busy && "cursor-not-allowed opacity-60 border-zinc-700",
+                      !@agent_chat_busy && "telvm-btn-primary"
+                    ]}
+                  >
+                    {if @agent_chat_busy, do: "Sending…", else: "Send"}
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <div class={["space-y-3", @agent_chat_tab != :goose && "hidden"]} id="agent-goose-chat">
+              <p class="text-[10px]" style="color: var(--telvm-shell-muted);">
+                Messages go to the Goose process in your stack (configured with Ollama). Streaming may arrive later; for now each send runs one agent turn.
+              </p>
+              <p
+                id="agent-goose-health-line"
+                class="text-[9px] font-mono leading-snug rounded border px-2 py-1.5"
+                style="border-color: var(--telvm-shell-border); color: var(--telvm-shell-muted); background: color-mix(in oklch, var(--telvm-input-bg) 88%, black);"
+              >
+                {goose_health_line(@goose_health_snapshot)}
+              </p>
+
+              <div
+                class="space-y-2 min-h-[10rem] max-h-[min(50vh,22rem)] overflow-y-auto rounded border p-3 text-[11px] font-mono leading-relaxed"
+                style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-input-bg) 94%, black);"
+              >
+                <div
+                  :if={@goose_chat_messages == [] && !@goose_chat_busy}
+                  class="text-[10px] italic"
+                  style="color: var(--telvm-shell-muted);"
+                >
+                  Say hello — you should get a reply once Goose is running and configured.
+                </div>
+                <div :for={m <- @goose_chat_messages} class={goose_chat_row_class(m)}>
+                  <div class="text-[9px] uppercase tracking-wide mb-0.5 telvm-accent-dim-text">
+                    {goose_chat_role_label(m)}
+                  </div>
+                  <div class="whitespace-pre-wrap break-words">{m["content"]}</div>
+                </div>
+                <div :if={@goose_chat_busy} class="text-[10px] telvm-accent-dim-text animate-pulse">
+                  Goose is thinking…
+                </div>
+              </div>
+
+              <p
+                :if={@goose_chat_error != nil}
+                class="text-[11px] telvm-text-danger-ink whitespace-pre-wrap"
+              >
+                {@goose_chat_error}
+              </p>
+
+              <div class="flex flex-wrap gap-2">
+                <button
+                  :if={@goose_chat_messages != []}
+                  type="button"
+                  phx-click="clear_goose_chat"
+                  class="px-2 py-1 text-[10px] font-mono rounded-md border uppercase tracking-wide telvm-btn-secondary"
+                >
+                  Clear
+                </button>
+              </div>
+
+              <form phx-submit="send_goose_chat" class="space-y-2">
+                <textarea
+                  name="content"
+                  rows="3"
+                  placeholder="Message the Goose agent…"
+                  disabled={@goose_chat_busy || @goose_container_id == nil}
+                  class="w-full px-2 py-2 text-xs font-mono border rounded-md telvm-accent-ring disabled:opacity-50"
+                  style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+                ></textarea>
+                <button
+                  type="submit"
+                  disabled={@goose_chat_busy || @goose_container_id == nil}
+                  class={[
+                    "px-3 py-2 text-[10px] sm:text-xs font-mono font-semibold rounded-md border uppercase tracking-wide",
+                    (@goose_chat_busy || @goose_container_id == nil) &&
+                      "cursor-not-allowed opacity-60 border-zinc-700",
+                    !@goose_chat_busy && @goose_container_id != nil && "telvm-btn-primary"
+                  ]}
+                >
+                  {if @goose_chat_busy, do: "Sending…", else: "Send"}
+                </button>
+              </form>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp agent_chat_transcript(messages) when is_list(messages) do
+    messages
+    |> Enum.map(fn
+      %{"role" => r, "content" => c} ->
+        "[#{r}] #{c}"
+
+      _ ->
+        ""
+    end)
+    |> Enum.join("\n\n")
+  end
+
+  defp agent_chat_tab_btn_class(true),
+    do:
+      "px-3 py-1.5 telvm-btn-primary border-0 rounded-none first:rounded-l last:rounded-r outline-none focus-visible:ring-1 focus-visible:ring-offset-0"
+
+  defp agent_chat_tab_btn_class(false),
+    do:
+      "px-3 py-1.5 rounded-none first:rounded-l last:rounded-r border-0 bg-black/25 text-[var(--telvm-shell-muted)] hover:text-[var(--telvm-shell-fg)] outline-none focus-visible:ring-1"
+
+  defp goose_chat_role_label(%{"role" => "user"}), do: "You"
+  defp goose_chat_role_label(%{"role" => "assistant"}), do: "Goose"
+  defp goose_chat_role_label(_), do: "—"
+
+  defp goose_chat_row_class(%{"role" => "user"}),
+    do: "rounded-md border border-zinc-700/60 bg-black/20 px-2 py-2"
+
+  defp goose_chat_row_class(%{"role" => "assistant"}),
+    do: "rounded-md border border-zinc-600/40 bg-black/35 px-2 py-2"
+
+  defp goose_chat_row_class(_), do: "px-2 py-2"
+
+  defp goose_health_line(nil) do
+    "Goose health: land here with the stack running; probes run periodically and when you open Agent setup."
+  end
+
+  defp goose_health_line(%Companion.GooseHealth.Snapshot{} = s) do
+    ts = Calendar.strftime(s.checked_at, "%H:%M:%S UTC")
+    c = goose_health_container_txt(s.container)
+    b = goose_health_step_txt(s.binary)
+    o = goose_health_step_txt(s.ollama)
+    a = goose_health_agent_txt(s.agent_run)
+
+    "Last check #{ts} · #{c} · binary #{b} · Ollama #{o} · hello #{a}"
+  end
+
+  defp goose_health_container_txt({:ok, id}) when is_binary(id) do
+    "ctr " <> String.slice(id, 0, 8) <> "…"
+  end
+
+  defp goose_health_container_txt({:error, :not_found}), do: "no Goose svc"
+  defp goose_health_container_txt({:error, other}), do: "ctr " <> inspect(other)
+
+  defp goose_health_step_txt(:ok), do: "OK"
+  defp goose_health_step_txt(:skipped), do: "—"
+
+  defp goose_health_step_txt({:error, msg}) do
+    "ERR " <> String.slice(to_string(msg), 0, 56)
+  end
+
+  defp goose_health_agent_txt(:skipped), do: "—"
+  defp goose_health_agent_txt(:ok), do: "OK"
+
+  defp goose_health_agent_txt({:error, msg}) do
+    "ERR " <> String.slice(to_string(msg), 0, 44)
+  end
+
+  defp trim_chat_messages(msgs, max) when is_list(msgs) and max > 0 do
+    if length(msgs) <= max, do: msgs, else: Enum.take(msgs, -max)
   end
 
   # --- Warm assets tab ---
@@ -838,6 +1792,7 @@ defmodule CompanionWeb.StatusLive do
         >
           Network blueprint
         </h2>
+
         <p class="text-[9px] font-mono mb-3" style="color: var(--telvm-shell-muted);">
           Live snapshot: Compose stack (from Engine) + lab VMs (this tab). Refreshes with the warm list.
         </p>
@@ -931,6 +1886,7 @@ defmodule CompanionWeb.StatusLive do
                   pause
                 </button>
               </div>
+
               <div :if={warm_machine_paused?(m)} class="flex flex-wrap items-center gap-1">
                 <button
                   type="button"
@@ -951,6 +1907,7 @@ defmodule CompanionWeb.StatusLive do
                   destroy
                 </button>
               </div>
+
               <div :if={warm_machine_destroy_only?(m)} class="flex flex-wrap items-center gap-1">
                 <button
                   type="button"
@@ -1049,6 +2006,7 @@ defmodule CompanionWeb.StatusLive do
           >
             logs
           </div>
+
           <button
             type="button"
             phx-click="refresh_warm_logs"
@@ -1206,9 +2164,11 @@ defmodule CompanionWeb.StatusLive do
               (local pull not required to read this)
             </span>
           </h3>
+
           <p class="text-[10px] mb-2 leading-snug" style="color: var(--telvm-shell-muted);">
             Key=value lines below are for humans and automation (agents); they summarize what this certified image contains and why it matches common production practice for the language.
           </p>
+
           <div
             class="rounded border p-2 mb-3 font-mono text-[10px] sm:text-[11px] leading-relaxed whitespace-pre-wrap overflow-x-auto"
             style="border-color: color-mix(in oklch, var(--telvm-shell-border) 85%, transparent); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
@@ -1217,9 +2177,11 @@ defmodule CompanionWeb.StatusLive do
           >
             {@selected_catalog_entry.stack_disclosure}
           </div>
+
           <h4 class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] font-semibold mb-1.5">
             why this shape (best practice)
           </h4>
+
           <p
             class="text-[11px] sm:text-xs leading-relaxed max-w-prose"
             style="color: var(--telvm-shell-muted);"
@@ -1634,6 +2596,9 @@ defmodule CompanionWeb.StatusLive do
     end
   end
 
+  defp goose_panel_container_display(nil), do: "—"
+  defp goose_panel_container_display(id) when is_binary(id), do: warm_logs_display_id(id)
+
   defp warm_logs_preamble(container_id, kind) when kind in [:initial, :refresh] do
     label =
       case kind do
@@ -1650,6 +2615,66 @@ defmodule CompanionWeb.StatusLive do
 
   defp warm_logs_with_preamble(container_id, raw_text, kind) do
     warm_logs_preamble(container_id, kind) <> (raw_text || "")
+  end
+
+  defp goose_logs_preamble(container_id, kind) when kind in [:initial, :refresh] do
+    label =
+      case kind do
+        :initial -> "Goose container logs (initial)"
+        :refresh -> "Goose container logs (refresh)"
+      end
+
+    ts =
+      DateTime.utc_now()
+      |> Calendar.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    "#{label} · container #{warm_logs_display_id(container_id)}\n#{ts}\n\n"
+  end
+
+  defp goose_logs_with_preamble(container_id, raw_text, kind) do
+    goose_logs_preamble(container_id, kind) <> (raw_text || "")
+  end
+
+  defp load_goose_panel(socket) do
+    socket =
+      socket
+      |> assign(:goose_logs_loading, true)
+      |> assign(:goose_logs_error, nil)
+
+    case GooseRuntime.find_container() do
+      {:ok, id, status} ->
+        case GooseRuntime.logs(id, tail: 200) do
+          {:ok, text} ->
+            socket
+            |> assign(:goose_container_id, id)
+            |> assign(:goose_status, status)
+            |> assign(:goose_logs_text, goose_logs_with_preamble(id, text, :initial))
+            |> assign(:goose_logs_loading, false)
+
+          {:error, reason} ->
+            socket
+            |> assign(:goose_container_id, id)
+            |> assign(:goose_status, status)
+            |> assign(:goose_logs_text, nil)
+            |> assign(:goose_logs_loading, false)
+            |> assign(:goose_logs_error, inspect(reason))
+        end
+
+      {:error, :not_found} ->
+        socket
+        |> assign(:goose_container_id, nil)
+        |> assign(:goose_status, "not found")
+        |> assign(:goose_logs_text, nil)
+        |> assign(:goose_logs_loading, false)
+
+      {:error, reason} ->
+        socket
+        |> assign(:goose_container_id, nil)
+        |> assign(:goose_status, "error")
+        |> assign(:goose_logs_text, nil)
+        |> assign(:goose_logs_loading, false)
+        |> assign(:goose_logs_error, inspect(reason))
+    end
   end
 
   defp clear_warm_logs_preview(socket) do
@@ -1878,6 +2903,7 @@ defmodule CompanionWeb.StatusLive do
     <nav class="flex flex-wrap gap-2 text-xs mb-4" aria-label="Companion views">
       <.link patch={~p"/warm"} class={nav_tab_class(@active, :warm_assets)}>Warm assets</.link>
       <.link patch={~p"/machines"} class={nav_tab_class(@active, :machines)}>Machines</.link>
+      <.link patch={~p"/agent"} class={nav_tab_class(@active, :agent_setup)}>Agent setup</.link>
       <.link patch={~p"/health"} class={nav_tab_class(@active, :preflight)}>Pre-flight</.link>
     </nav>
     """

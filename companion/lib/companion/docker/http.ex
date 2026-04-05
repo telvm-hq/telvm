@@ -192,7 +192,8 @@ defmodule Companion.Docker.HTTP do
          {:ok, raw} <- start_exec(exec_id),
          {:ok, exec_info} <- inspect_exec(exec_id) do
       exit_code = get_in(exec_info, ["ExitCode"]) || 0
-      {:ok, %{stdout: demux_stdout(raw), exit_code: exit_code}}
+      # Include stderr (stream type 2) so e.g. "command not found" is visible on non-zero exit.
+      {:ok, %{stdout: demux_mixed_stream(raw), exit_code: exit_code}}
     end
   end
 

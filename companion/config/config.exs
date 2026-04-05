@@ -11,7 +11,14 @@ config :companion,
   ecto_repos: [Companion.Repo],
   generators: [timestamp_type: :utc_datetime],
   docker_socket: "/var/run/docker.sock",
-  docker_api_version: "v1.45"
+  docker_api_version: "v1.45",
+  # OpenAI-compatible API base (include /v1). Overridden at runtime via TELVM_INFERENCE_BASE_URL.
+  default_inference_base_url: "http://host.docker.internal:11434/v1"
+
+config :companion, Companion.GooseHealth,
+  enabled: true,
+  interval_ms: :timer.minutes(5),
+  sample_run: true
 
 # Configure the endpoint
 config :companion, CompanionWeb.Endpoint,

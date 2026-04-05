@@ -28,6 +28,71 @@ services:
       telvm.sandbox: "true"
       telvm.runtime: "node"
 
+  # OpenAI-compatible inference for Agent setup (/agent). CPU-first: no GPU devices; optional envs reduce parallel load.
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      CUDA_VISIBLE_DEVICES: "-1"
+      OLLAMA_NUM_PARALLEL: "1"
+
+  # Goose CLI: long-lived container for `docker compose exec -it goose goose session` (TTY); config in goose_config volume.
+  goose:
+    build:
+      context: ./images/goose
+      dockerfile: Dockerfile
+    depends_on:
+      ollama:
+        condition: service_started
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    volumes:
+      - goose_config:/root/.config/goose
+    labels:
+      telvm.goose: "true"
+    stdin_open: true
+    tty: true
+    command: ["sleep", "infinity"]
+
+  # One-shot: wait for ollama API, then pull two small models (disk only; inference loads one at a time as needed).
+  # Override names via .env: TELVM_OLLAMA_MODEL_A / TELVM_OLLAMA_MODEL_B
+  ollama_pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_started
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      MODEL_A: ${TELVM_OLLAMA_MODEL_A:-qwen2.5:0.5b}
+      MODEL_B: ${TELVM_OLLAMA_MODEL_B:-tinyllama}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "ollama_pull: waiting for ollama at $$OLLAMA_HOST..."
+        i=0
+        while [ $$i -lt 120 ]; do
+          if ollama list >/dev/null 2>&1; then
+            echo "ollama_pull: server ready"
+            break
+          fi
+          i=$$((i + 1))
+          sleep 1
+        done
+        if [ $$i -eq 120 ]; then
+          echo "ollama_pull: timeout waiting for server" >&2
+          exit 1
+        fi
+        echo "ollama_pull: pulling $$MODEL_A ..."
+        ollama pull "$$MODEL_A"
+        echo "ollama_pull: pulling $$MODEL_B ..."
+        ollama pull "$$MODEL_B"
+        echo "ollama_pull: done"
+    restart: "no"
+
   companion:
     build:
       context: .
@@ -48,6 +113,7 @@ services:
       PHX_HTTP_IP: 0.0.0.0
       PHX_SERVER: "true"
       PORT: "4000"
+      TELVM_INFERENCE_BASE_URL: http://ollama:11434/v1
       # Ephemeral VM manager pre-flight lab container: same Compose network + fixed DNS alias for probes.
       TELVM_LAB_DOCKER_NETWORK: telvm_default
       TELVM_LAB_DNS_ALIAS: telvm-lab-workload
@@ -58,6 +124,8 @@ services:
       db:
         condition: service_healthy
       vm_node:
+        condition: service_started
+      ollama:
         condition: service_started
 
   # One-shot test runner (canonical local/CI-style run inside Linux). Does not start phx.server.
@@ -88,3 +156,5 @@ volumes:
   companion_deps:
   companion_build:
   companion_assets_node:
+  ollama_data:
+  goose_config:

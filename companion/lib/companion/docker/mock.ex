@@ -87,6 +87,29 @@ defmodule Companion.Docker.Mock do
   def container_exec(_id, _cmd, _opts), do: {:ok, ""}
 
   @impl true
+  def container_exec_with_exit(_id, ["/usr/local/bin/goose", "run", "--text", text], _opts)
+      when is_binary(text) do
+    preview = String.slice(text, 0, 160)
+
+    {:ok,
+     %{
+       stdout: "Hello — I'm Goose (mock). You said: #{preview}\n",
+       exit_code: 0
+     }}
+  end
+
+  def container_exec_with_exit(_id, ["/usr/local/bin/goose", "--version"], _opts) do
+    {:ok, %{stdout: "goose 1.29.1 (mock)\n", exit_code: 0}}
+  end
+
+  def container_exec_with_exit(
+        _id,
+        ["curl", "-sfS", "--max-time", "12", "http://ollama:11434/api/tags"],
+        _opts
+      ) do
+    {:ok, %{stdout: "{\"models\":[]}\n", exit_code: 0}}
+  end
+
   def container_exec_with_exit(_id, _cmd, _opts) do
     {:ok, %{stdout: "", exit_code: 0}}
   end
