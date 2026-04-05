@@ -60,6 +60,8 @@ config :phoenix,
 
 config :companion, :docker_adapter, Companion.Docker.Mock
 
+config :companion, Companion.GooseHealth, enabled: false
+
 # VM manager pre-flight health probes use real Finch by default; stub in tests so the runner stays deterministic.
 config :companion, :vm_manager_preflight_http_fun, fn _url ->
   {:ok, %{status: 200, latency_ms: 0}}

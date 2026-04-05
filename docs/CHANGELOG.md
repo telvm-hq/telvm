@@ -4,6 +4,16 @@ All notable changes to this project are documented here and in [GitHub Releases]
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) where it applies to tagged releases.
 
+## [Unreleased]
+
+### Agent setup (optional CPU inference)
+
+- **Compose:** optional **Ollama**, one-shot **ollama_pull**, and **Goose** CLI image; companion env **`TELVM_INFERENCE_BASE_URL`**, **`TELVM_AGENT_DEFAULT_MODEL`** (see [quickstart](quickstart.md)).
+- **LiveView (`/agent`):** OpenAI-compatible model list + **Model** tab chat ([`Companion.InferenceChat`](../companion/lib/companion/inference_chat.ex)), **Goose** tab via Engine **exec** ([`Companion.GooseRuntime`](../companion/lib/companion/goose_runtime.ex)), [`Companion.GooseHealth`](../companion/lib/companion/goose_health.ex) probes, operator diagnostics (logs / restart). Default tab **Goose**; auto-probe Ollama on load; Model chat completion runs **asynchronously** so the UI can render before the HTTP reply finishes.
+- **Goose image:** Debian **`libgomp1`** for the upstream Linux binary; build-time **`goose --version`** check.
+
+No breaking changes to the **Machine API** (`/telvm/api`) or to **ProxyPlug** / lab **Verify** flows.
+
 ## [1.1.0] — 2026-03-31
 
 Major companion **operator UI** refresh. Full narrative for maintainers and GitHub Releases: [`releases/v1.1.0.md`](releases/v1.1.0.md).

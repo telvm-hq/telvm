@@ -29,6 +29,7 @@ defmodule CompanionWeb.Router do
       live "/health", StatusLive, :preflight
       live "/warm", StatusLive, :warm_assets
       live "/machines", StatusLive, :machines
+      live "/agent", StatusLive, :agent_setup
       live "/images", StatusLive, :legacy_images_redirect
       live "/vm-manager-preflight", StatusLive, :legacy_preflight_redirect
       live "/certificate", StatusLive, :legacy_certificate_redirect

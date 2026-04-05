@@ -14,6 +14,7 @@ defmodule Companion.Application do
       {DynamicSupervisor,
        strategy: :one_for_one, name: Companion.VmLifecycle.RunnerDynamicSupervisor},
       Companion.PreflightServer,
+      {Companion.GooseHealth, Application.get_env(:companion, Companion.GooseHealth, [])},
       CompanionWeb.Endpoint
     ]
 

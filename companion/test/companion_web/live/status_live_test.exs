@@ -15,6 +15,7 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ "Postgres (Ecto Repo)"
     assert html =~ ~s(href="/warm")
     assert html =~ ~s(href="/machines")
+    assert html =~ ~s(href="/agent")
     assert html =~ "/health"
     assert html =~ "telvm/api/fyi"
   end
@@ -22,6 +23,24 @@ defmodule CompanionWeb.StatusLiveTest do
   test "GET /topology redirects to /warm", %{conn: conn} do
     conn = get(conn, ~p"/topology")
     assert redirected_to(conn) == "/warm"
+  end
+
+  test "GET /agent renders agent setup preflight panel", %{conn: conn} do
+    conn = get(conn, ~p"/agent")
+    html = html_response(conn, 200)
+    assert html =~ "telvm · agent setup"
+    assert html =~ "agent-inference-preflight"
+    assert html =~ ~s(id="agent-goose-panel")
+    assert html =~ ~s(id="agent-chat-panel")
+    assert html =~ ~s(phx-submit="test_inference_endpoint")
+    assert html =~ ~s(phx-click="set_agent_chat_tab")
+    assert html =~ ~s(phx-submit="start_agent_chat")
+    assert html =~ ~s(phx-submit="send_goose_chat")
+    assert html =~ ~s(id="agent-goose-chat")
+    assert html =~ ~s(id="agent-goose-health-line")
+    assert html =~ ~s(href="/agent")
+    assert html =~ ~s(href="/warm")
+    assert html =~ ~s(href="/machines")
   end
 
   test "GET /warm renders warm assets layout and network blueprint", %{conn: conn} do
