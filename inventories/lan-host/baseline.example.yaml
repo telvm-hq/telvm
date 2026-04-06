@@ -1,0 +1,33 @@
+# Example baseline inventory (committed). Copy to baseline.local.yaml (gitignored) and edit.
+# After running scripts/lan-host/collect-ubuntu-inventory.sh on the host, paste output under raw_console_output.
+
+schema_version: 1
+host_id: "ubuntu-lab-01"
+role: "worker" # or control, edge, etc.
+
+network:
+  primary_ipv4: "192.168.0.0" # replace
+  mac: "00:00:00:00:00:00" # optional
+  default_gateway: "192.168.0.1" # optional
+  dns: [] # e.g. ["192.168.0.1"]
+
+os:
+  pretty_name: "Ubuntu 24.04 LTS" # from /etc/os-release
+  kernel: "6.x.x-generic" # from uname -a
+
+hardware:
+  cpu_model: ""
+  ram_human: ""
+  disks_summary: ""
+
+listening_tcp_ports: [] # e.g. [22, 80] from ss -tlnp
+
+ssh:
+  port: 22
+  user_for_admin: "ubuntu"
+
+notes: |
+  Assumptions and things not to change on this machine.
+
+raw_console_output: |
+  (paste output of collect-ubuntu-inventory.sh here)

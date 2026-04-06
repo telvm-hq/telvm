@@ -61,6 +61,8 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 
 5. **Preview and visibility:** **`/app/<container>/port/<n>/…`** reverse-proxies HTTP into a container (same links appear as **proxy URLs** from the API and port links on Machines). **`/explore/<container_id>`** is the read-only filesystem + **Monaco** editor shell for code inside a running lab.
 
+6. **Optional — Physical LAN / lab hosts (no Docker required on the target):** If you bring up **real Ubuntu machines** on a switch, **Wi‑Fi vs Ethernet**, **Windows Internet Connection Sharing**, or **static Netplan** (e.g. UniFi), start with **[docs/lan-cluster-network-primer.md](docs/lan-cluster-network-primer.md)** and **[inventories/lan-host/README.md](inventories/lan-host/README.md)**. Example netplan and scripts live under **`inventories/lan-host/`** and **`scripts/lan-host/`** / **`scripts/windows/`**. Set **`TELVM_LAN_TARGET_HOST`** in **`.env`** (see **`.env.example`**) to point the companion container at a reachable host for **`scripts/lan-host/test-lan-from-companion.sh`**.
+
 **Operator surfaces on one port:** dashboard pages (`/`, `/health`, `/warm`, `/machines`, **`/agent`**, …), **`/telvm/api/…`** for tools, and **`/app/…` + `/explore/…`** to see and open workloads — [Architecture](docs/ARCHITECTURE.md). **`/topology`** redirects to **`/warm`** (bookmark compatibility). **PubSub, SSE vs LiveView, and what agents see vs the UI:** [Plumbing](docs/plumbing.md).
 
 ### Glossary

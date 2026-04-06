@@ -1,5 +1,9 @@
-# Private planning and strategy docs -- NEVER commit
-.internal/
+# Private material under .internal/ — see .internal/README.md
+# Tracked: .internal/README.md and .internal/architecture/ (versioned internal architecture notes)
+.internal/*
+!.internal/README.md
+!.internal/architecture/
+!.internal/architecture/**
 
 # Elixir / Phoenix (companion app)
 # Never commit build artifacts or deps — verify with: git status (should not list _build/ or deps/)
@@ -24,6 +28,13 @@ mcp/dist/
 .env
 .env.*
 !.env.example
+
+# Local LAN host inventories (may contain IPs, keys in notes)
+inventories/lan-host/baseline.local.yaml
+inventories/lan-host/*.local.txt
+
+# Golden host profile exports (machine-specific; use capture-golden-profile.sh locally)
+golden-profile-*/
 
 # Docker
 docker-compose.override.yml
