@@ -29,6 +29,16 @@ config :companion, :inference_base_url,
 config :companion, :agent_default_model,
   System.get_env("TELVM_AGENT_DEFAULT_MODEL") || "qwen2.5:0.5b"
 
+lan_ssh_port =
+  case Integer.parse(System.get_env("TELVM_LAN_TARGET_SSH_PORT") || "22") do
+    {n, _} when n > 0 and n < 65536 -> n
+    _ -> 22
+  end
+
+config :companion, :lan_target,
+  host: System.get_env("TELVM_LAN_TARGET_HOST"),
+  ssh_port: lan_ssh_port
+
 # Use Docker Engine HTTP adapter when the Unix socket is present (e.g. docker compose).
 unless config_env() == :test do
   sock = Application.get_env(:companion, :docker_socket, "/var/run/docker.sock")
