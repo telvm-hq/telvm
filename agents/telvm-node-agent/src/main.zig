@@ -26,15 +26,12 @@ fn parseArgs(alloc: std.mem.Allocator) !Config {
                 token = v;
             }
         } else if (std.mem.eql(u8, arg, "--version")) {
-            var buf: [256]u8 = undefined;
-            var w = std.fs.File.stdout().writer(&buf).file_writer;
-            try w.interface.print("telvm-node-agent {s}\n", .{version});
-            try w.interface.flush();
+            const stdout = std.io.getStdOut().writer();
+            try stdout.print("telvm-node-agent {s}\n", .{version});
             std.process.exit(0);
         } else if (std.mem.eql(u8, arg, "--help")) {
-            var buf: [1024]u8 = undefined;
-            var w = std.fs.File.stdout().writer(&buf).file_writer;
-            try w.interface.print(
+            const stdout = std.io.getStdOut().writer();
+            try stdout.print(
                 \\telvm-node-agent — minimal HTTP agent for telvm cluster
                 \\
                 \\Usage: telvm-node-agent [OPTIONS]
@@ -46,7 +43,6 @@ fn parseArgs(alloc: std.mem.Allocator) !Config {
                 \\  --help           Show this help
                 \\
             , .{});
-            try w.interface.flush();
             std.process.exit(0);
         }
     }
@@ -62,18 +58,14 @@ pub fn main() !void {
     const config = try parseArgs(alloc);
 
     if (config.token.len == 0) {
-        var buf: [256]u8 = undefined;
-        var w = std.fs.File.stderr().writer(&buf).file_writer;
-        try w.interface.print("error: --token is required\n", .{});
-        try w.interface.flush();
+        const stderr = std.io.getStdErr().writer();
+        try stderr.print("error: --token is required\n", .{});
         std.process.exit(1);
     }
 
     {
-        var buf: [256]u8 = undefined;
-        var w = std.fs.File.stderr().writer(&buf).file_writer;
-        try w.interface.print("telvm-node-agent {s} listening on :{d}\n", .{ version, config.port });
-        try w.interface.flush();
+        const stderr = std.io.getStdErr().writer();
+        try stderr.print("telvm-node-agent {s} listening on :{d}\n", .{ version, config.port });
     }
 
     const address = std.net.Address.parseIp("0.0.0.0", config.port) catch unreachable;
@@ -82,18 +74,14 @@ pub fn main() !void {
 
     while (true) {
         const conn = server.accept() catch |err| {
-            var buf: [256]u8 = undefined;
-            var w = std.fs.File.stderr().writer(&buf).file_writer;
-            w.interface.print("accept error: {}\n", .{err}) catch {};
-            w.interface.flush() catch {};
+            const stderr = std.io.getStdErr().writer();
+            stderr.print("accept error: {}\n", .{err}) catch {};
             continue;
         };
 
         handleConnection(alloc, conn, config.token) catch |err| {
-            var buf: [256]u8 = undefined;
-            var w = std.fs.File.stderr().writer(&buf).file_writer;
-            w.interface.print("request error: {}\n", .{err}) catch {};
-            w.interface.flush() catch {};
+            const stderr = std.io.getStdErr().writer();
+            stderr.print("request error: {}\n", .{err}) catch {};
         };
         conn.stream.close();
     }
@@ -101,29 +89,30 @@ pub fn main() !void {
 
 fn handleConnection(alloc: std.mem.Allocator, conn: std.net.Server.Connection, token: []const u8) !void {
     var read_buf: [8192]u8 = undefined;
-    var write_buf: [8192]u8 = undefined;
-    var reader = conn.stream.reader(&read_buf).file_reader;
-    var writer = conn.stream.writer(&write_buf).file_writer;
-    var http_server = std.http.Server.init(&reader.interface, &writer.interface);
+    var http_server = std.http.Server.init(conn, &read_buf);
 
     var req = try http_server.receiveHead();
 
     if (!checkAuth(&req, token)) {
         try req.respond("401 Unauthorized\n", .{ .status = .unauthorized });
-        try writer.interface.flush();
         return;
     }
 
     try router.route(alloc, &req);
-    try writer.interface.flush();
 }
 
 fn checkAuth(req: *std.http.Server.Request, expected_token: []const u8) bool {
     if (expected_token.len == 0) return true;
 
-    const auth_header = req.head.authorization orelse return false;
-    const prefix = "Bearer ";
-    if (!std.mem.startsWith(u8, auth_header, prefix)) return false;
-    const provided = auth_header[prefix.len..];
-    return std.mem.eql(u8, provided, expected_token);
+    var it = req.iterateHeaders();
+    while (it.next()) |header| {
+        if (std.ascii.eqlIgnoreCase(header.name, "authorization")) {
+            const value = header.value;
+            const prefix = "Bearer ";
+            if (!std.mem.startsWith(u8, value, prefix)) return false;
+            const provided = value[prefix.len..];
+            return std.mem.eql(u8, provided, expected_token);
+        }
+    }
+    return false;
 }

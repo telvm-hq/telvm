@@ -15,24 +15,18 @@ pub fn proxyGet(alloc: std.mem.Allocator, req: *std.http.Server.Request, engine_
     };
     defer sock.close();
 
-    // Send raw HTTP/1.1 request over the unix socket
     var request_buf: [2048]u8 = undefined;
     const request_line = try std.fmt.bufPrint(&request_buf, "GET {s} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n", .{engine_path});
 
-    var write_buf: [4096]u8 = undefined;
-    var writer = sock.writer(&write_buf).file_writer;
-    _ = try writer.interface.write(request_line);
-    try writer.interface.flush();
+    try sock.writer().writeAll(request_line);
 
-    // Read the full response
     var response_data = std.ArrayList(u8).init(alloc);
     defer response_data.deinit();
 
-    var read_buf: [8192]u8 = undefined;
-    var sock_reader = sock.reader(&read_buf).file_reader;
+    const reader = sock.reader();
     while (true) {
         var chunk: [4096]u8 = undefined;
-        const n = sock_reader.interface.read(&chunk) catch break;
+        const n = reader.read(&chunk) catch break;
         if (n == 0) break;
         try response_data.appendSlice(chunk[0..n]);
         if (response_data.items.len > max_response_size) break;
@@ -40,13 +34,11 @@ pub fn proxyGet(alloc: std.mem.Allocator, req: *std.http.Server.Request, engine_
 
     const raw = response_data.items;
 
-    // Find body after \r\n\r\n header separator
     const body = if (std.mem.indexOf(u8, raw, "\r\n\r\n")) |pos|
         raw[pos + 4 ..]
     else
         raw;
 
-    // Transfer-Encoding: chunked requires decoding
     const is_chunked = std.mem.indexOf(u8, raw, "Transfer-Encoding: chunked") != null;
 
     if (is_chunked) {
@@ -82,7 +74,7 @@ fn dechunk(alloc: std.mem.Allocator, data: []const u8) ![]const u8 {
         if (chunk_end > data.len) break;
 
         try result.appendSlice(data[chunk_start..chunk_end]);
-        pos = chunk_end + 2; // skip trailing \r\n
+        pos = chunk_end + 2;
     }
 
     return try result.toOwnedSlice();

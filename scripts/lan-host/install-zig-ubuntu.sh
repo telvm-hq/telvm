@@ -9,7 +9,7 @@
 #   sudo bash install-zig-ubuntu.sh --remove
 set -euo pipefail
 
-ZIG_VERSION="${ZIG_VERSION:-0.15.2}"
+ZIG_VERSION="${ZIG_VERSION:-0.13.0}"
 INSTALL_DIR="/opt"
 LINK="/usr/local/bin/zig"
 INDEX_URL="https://ziglang.org/download/index.json"
