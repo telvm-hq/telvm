@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const docker_socket_path = "/var/run/docker.sock";
-const max_response_size = 4 * 1024 * 1024; // 4 MiB cap for Docker Engine responses
+const max_response_size = 4 * 1024 * 1024; // 4 MiB cap
 
 pub fn proxyGet(alloc: std.mem.Allocator, req: *std.http.Server.Request, engine_path: []const u8) !void {
     const sock = std.net.connectUnixSocket(docker_socket_path) catch {
@@ -15,19 +15,26 @@ pub fn proxyGet(alloc: std.mem.Allocator, req: *std.http.Server.Request, engine_
     };
     defer sock.close();
 
+    // Send raw HTTP/1.1 request over the unix socket
     var request_buf: [2048]u8 = undefined;
     const request_line = try std.fmt.bufPrint(&request_buf, "GET {s} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n", .{engine_path});
 
-    _ = try sock.write(request_line);
+    var write_buf: [4096]u8 = undefined;
+    var writer = sock.writer(&write_buf).file_writer;
+    _ = try writer.interface.write(request_line);
+    try writer.interface.flush();
 
+    // Read the full response
     var response_data = std.ArrayList(u8).init(alloc);
     defer response_data.deinit();
 
     var read_buf: [8192]u8 = undefined;
+    var sock_reader = sock.reader(&read_buf).file_reader;
     while (true) {
-        const n = sock.read(&read_buf) catch break;
+        var chunk: [4096]u8 = undefined;
+        const n = sock_reader.interface.read(&chunk) catch break;
         if (n == 0) break;
-        try response_data.appendSlice(read_buf[0..n]);
+        try response_data.appendSlice(chunk[0..n]);
         if (response_data.items.len > max_response_size) break;
     }
 

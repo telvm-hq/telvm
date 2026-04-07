@@ -1,6 +1,5 @@
 const std = @import("std");
-
-const agent_version = "0.1.0";
+const main_mod = @import("main.zig");
 
 pub fn handle(req: *std.http.Server.Request) !void {
     var hostname_buf: [256]u8 = undefined;
@@ -12,7 +11,7 @@ pub fn handle(req: *std.http.Server.Request) !void {
     var buf: [1024]u8 = undefined;
     const body = try std.fmt.bufPrint(&buf,
         \\{{"hostname":"{s}","uptime_s":{d},"agent_version":"{s}","docker_reachable":{s}}}
-    , .{ hostname, uptime_s, agent_version, if (docker_ok) "true" else "false" });
+    , .{ hostname, uptime_s, main_mod.version, if (docker_ok) "true" else "false" });
 
     try req.respond(body, .{
         .extra_headers = &.{
@@ -24,16 +23,15 @@ pub fn handle(req: *std.http.Server.Request) !void {
 fn getHostname(buf: []u8) ![]const u8 {
     const file = std.fs.openFileAbsolute("/etc/hostname", .{}) catch return error.NoHostname;
     defer file.close();
-    const n = try file.read(buf);
-    const raw = buf[0..n];
-    return std.mem.trimRight(u8, raw, "\n\r ");
+    const n = try file.reader(&.{}).file_reader.interface.read(buf);
+    return std.mem.trimRight(u8, buf[0..n], "\n\r ");
 }
 
 fn getUptimeSeconds() !u64 {
     const file = std.fs.openFileAbsolute("/proc/uptime", .{}) catch return error.NoUptime;
     defer file.close();
     var buf: [128]u8 = undefined;
-    const n = try file.read(&buf);
+    const n = try file.reader(&.{}).file_reader.interface.read(&buf);
     const content = buf[0..n];
     const space = std.mem.indexOf(u8, content, " ") orelse return error.ParseError;
     const uptime_str = content[0..space];
