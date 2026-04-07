@@ -29,15 +29,25 @@ config :companion, :inference_base_url,
 config :companion, :agent_default_model,
   System.get_env("TELVM_AGENT_DEFAULT_MODEL") || "qwen2.5:0.5b"
 
-lan_ssh_port =
-  case Integer.parse(System.get_env("TELVM_LAN_TARGET_SSH_PORT") || "22") do
-    {n, _} when n > 0 and n < 65536 -> n
-    _ -> 22
+cluster_nodes =
+  case System.get_env("TELVM_CLUSTER_NODES") do
+    json when is_binary(json) and json != "" ->
+      case Jason.decode(json) do
+        {:ok, list} when is_list(list) ->
+          Enum.map(list, fn entry ->
+            %{url: Map.get(entry, "url", ""), label: Map.get(entry, "label", "")}
+          end)
+
+        _ ->
+          []
+      end
+
+    _ ->
+      []
   end
 
-config :companion, :lan_target,
-  host: System.get_env("TELVM_LAN_TARGET_HOST"),
-  ssh_port: lan_ssh_port
+config :companion, :cluster_nodes, cluster_nodes
+config :companion, :cluster_token, System.get_env("TELVM_CLUSTER_TOKEN") || ""
 
 # Use Docker Engine HTTP adapter when the Unix socket is present (e.g. docker compose).
 unless config_env() == :test do

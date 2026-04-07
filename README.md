@@ -6,6 +6,10 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 
 <p align="center">
+  <img src="docs/assets/cluster-dashboard.png" alt="telvm companion dashboard showing 3 cluster nodes reporting ok, with pre-flight checks all passing" width="920" />
+</p>
+
+<p align="center">
   <img src="docs/assets/TELVM_IMAGE_BANNER.png" alt="telvm: Docker runtimes, localhost:4000, /telvm/api, Machines and health, eel mascot" width="920" />
 </p>
 
@@ -61,7 +65,7 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 
 5. **Preview and visibility:** **`/app/<container>/port/<n>/…`** reverse-proxies HTTP into a container (same links appear as **proxy URLs** from the API and port links on Machines). **`/explore/<container_id>`** is the read-only filesystem + **Monaco** editor shell for code inside a running lab.
 
-6. **Optional — Physical LAN / lab hosts (no Docker required on the target):** If you bring up **real Ubuntu machines** on a switch, **Wi‑Fi vs Ethernet**, **Windows Internet Connection Sharing**, or **static Netplan** (e.g. UniFi), start with **[docs/lan-cluster-network-primer.md](docs/lan-cluster-network-primer.md)** and **[inventories/lan-host/README.md](inventories/lan-host/README.md)**. Example netplan and scripts live under **`inventories/lan-host/`** and **`scripts/lan-host/`** / **`scripts/windows/`**. Set **`TELVM_LAN_TARGET_HOST`** in **`.env`** (see **`.env.example`**) to point the companion container at a reachable host for **`scripts/lan-host/test-lan-from-companion.sh`**.
+6. **Optional — Cluster nodes (Ubuntu hosts with Docker Engine):** Deploy the lightweight **[`telvm-node-agent`](agents/telvm-node-agent/README.md)** (Zig binary) to each host; it exposes `/health` and proxies a narrow Docker Engine slice over HTTP. Set **`TELVM_CLUSTER_NODES`** (JSON array) and **`TELVM_CLUSTER_TOKEN`** in **`.env`** (see **`.env.example`**); the companion's **`Companion.ClusterNodePoller`** polls each agent and broadcasts results on PubSub — Pre-flight shows a **cluster nodes** table when configured. For **physical LAN bring-up** (networking, netplan, ICS), see **[docs/lan-cluster-network-primer.md](docs/lan-cluster-network-primer.md)** and **[inventories/lan-host/README.md](inventories/lan-host/README.md)**.
 
 **Operator surfaces on one port:** dashboard pages (`/`, `/health`, `/warm`, `/machines`, **`/agent`**, …), **`/telvm/api/…`** for tools, and **`/app/…` + `/explore/…`** to see and open workloads — [Architecture](docs/ARCHITECTURE.md). **`/topology`** redirects to **`/warm`** (bookmark compatibility). **PubSub, SSE vs LiveView, and what agents see vs the UI:** [Plumbing](docs/plumbing.md).
 

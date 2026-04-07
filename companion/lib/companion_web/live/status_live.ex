@@ -12,6 +12,8 @@ defmodule CompanionWeb.StatusLive do
   alias Companion.InferenceChat
   alias Companion.GooseRuntime
   alias Companion.GooseHealth
+  alias Companion.ClusterNodePoller
+  alias Companion.ClusterNodesConfig
 
   @default_entry LabCatalog.get(:cert_phoenix)
   @agent_chat_max_messages 40
@@ -75,6 +77,8 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:goose_logs_loading, false)
       |> assign(:goose_logs_error, nil)
       |> assign(:goose_health_snapshot, nil)
+      |> assign(:cluster_snapshot, [])
+      |> assign(:cluster_configured, ClusterNodesConfig.configured?())
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Companion.PubSub, Preflight.topic())
@@ -82,6 +86,10 @@ defmodule CompanionWeb.StatusLive do
       Phoenix.PubSub.subscribe(Companion.PubSub, LabImageBuilder.topic())
       Phoenix.PubSub.subscribe(Companion.PubSub, SoakRunner.topic())
       Phoenix.PubSub.subscribe(Companion.PubSub, GooseHealth.topic())
+
+      if ClusterNodesConfig.configured?() do
+        Phoenix.PubSub.subscribe(Companion.PubSub, ClusterNodePoller.topic())
+      end
 
       if socket.assigns.live_action == :agent_setup do
         send(self(), :load_goose_panel)
@@ -175,6 +183,10 @@ defmodule CompanionWeb.StatusLive do
   @impl true
   def handle_info({:report, report}, socket) do
     {:noreply, assign(socket, :report, report)}
+  end
+
+  def handle_info({:cluster_snapshot, results}, socket) when is_list(results) do
+    {:noreply, assign(socket, :cluster_snapshot, results)}
   end
 
   def handle_info({:vm_manager_preflight, {:line, kind, ts, text}}, socket) do
@@ -2442,6 +2454,70 @@ defmodule CompanionWeb.StatusLive do
               </span>
             </div>
           </div>
+
+          <section :if={@cluster_configured} class="mb-5" id="cluster-nodes-section">
+            <div
+              class="text-[11px] uppercase tracking-wide mb-1 font-semibold"
+              style="color: var(--telvm-shell-muted);"
+            >
+              cluster nodes
+            </div>
+
+            <p class="text-xs mb-2 leading-relaxed max-w-2xl" style="color: var(--telvm-shell-muted);">
+              HTTP health from remote
+              <span class="font-mono telvm-accent-dim-text">telvm-node-agent</span>
+              instances. PubSub
+              <span class="font-mono telvm-accent-dim-text">cluster_nodes:updates</span>
+              · <span class="font-mono telvm-accent-dim-text">Companion.ClusterNodePoller</span>
+            </p>
+
+            <div
+              :if={@cluster_snapshot == []}
+              class="text-xs font-mono py-2"
+              style="color: var(--telvm-shell-muted);"
+            >
+              Waiting for first poll…
+            </div>
+
+            <div
+              :if={@cluster_snapshot != []}
+              class="overflow-x-auto telvm-panel-border border"
+            >
+              <div class="grid grid-cols-12 gap-x-2 px-2 py-1 text-[10px] uppercase tracking-wide telvm-term-header">
+                <span class="col-span-3">label</span>
+                <span class="col-span-2">status</span>
+                <span class="col-span-3">hostname</span>
+                <span class="col-span-2">docker</span>
+                <span class="col-span-2">checked</span>
+              </div>
+              <div :for={node <- @cluster_snapshot} class="term-row">
+                <div class="col-span-3 font-mono text-xs truncate" title={node.url}>
+                  {node.label}
+                </div>
+                <div class="col-span-2">
+                  <span :if={node.status == :ok} class="text-xs font-mono telvm-text-ok">ok</span>
+                  <span :if={node.status == :unreachable} class="text-xs font-mono telvm-text-danger-ink">
+                    unreachable
+                  </span>
+                  <span :if={node.status == :timeout} class="text-xs font-mono telvm-text-danger-ink">
+                    timeout
+                  </span>
+                </div>
+                <div class="col-span-3 font-mono text-xs truncate" style="color: var(--telvm-shell-muted);">
+                  {if node.health, do: node.health["hostname"] || "—", else: "—"}
+                </div>
+                <div class="col-span-2 font-mono text-xs" style="color: var(--telvm-shell-muted);">
+                  {if node.health, do: (if node.health["docker_reachable"], do: "yes", else: "no"), else: "—"}
+                </div>
+                <div
+                  class="col-span-2 text-xs font-mono tabular-nums"
+                  style="color: var(--telvm-shell-muted);"
+                >
+                  {Calendar.strftime(node.checked_at, "%H:%M:%S")}
+                </div>
+              </div>
+            </div>
+          </section>
 
           <section class="mb-5" id="preflight-gating-section">
             <div
