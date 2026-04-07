@@ -1,0 +1,19 @@
+# Example: static lab address on 10.10.10.11 with default route + public DNS.
+# Copy to /etc/netplan/99-lab-static.yaml and set mode 600:
+#   sudo install -m 600 -T netplan-10.10.10.11.example.yaml /etc/netplan/99-lab-static.yaml
+# CRITICAL: Replace 10.10.10.1 in "via:" with your UniFi Gateway IP for this VLAN if different.
+# Confirm interface with: ip -br link  (often enp2s0 on Ubuntu VMs)
+network:
+  version: 2
+  ethernets:
+    enp2s0:
+      dhcp4: false
+      addresses:
+        - 10.10.10.11/24
+      routes:
+        - to: default
+          via: 10.10.10.1
+      nameservers:
+        addresses:
+          - 1.1.1.1
+          - 8.8.8.8
