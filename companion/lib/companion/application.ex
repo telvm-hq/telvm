@@ -5,7 +5,7 @@ defmodule Companion.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
+    base = [
       CompanionWeb.Telemetry,
       {Phoenix.PubSub, name: Companion.PubSub},
       Companion.Repo,
@@ -13,13 +13,27 @@ defmodule Companion.Application do
       {Finch, name: Companion.Finch, pools: finch_pools()},
       {DynamicSupervisor,
        strategy: :one_for_one, name: Companion.VmLifecycle.RunnerDynamicSupervisor},
-      Companion.PreflightServer,
-      {Companion.GooseHealth, Application.get_env(:companion, Companion.GooseHealth, [])},
-      CompanionWeb.Endpoint
+      Companion.PreflightServer
     ]
+
+    children =
+      base ++
+        cluster_children() ++
+        [
+          {Companion.GooseHealth, Application.get_env(:companion, Companion.GooseHealth, [])},
+          CompanionWeb.Endpoint
+        ]
 
     opts = [strategy: :rest_for_one, name: Companion.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp cluster_children do
+    if Companion.ClusterNodesConfig.configured?() do
+      [Companion.ClusterNodePoller]
+    else
+      []
+    end
   end
 
   @impl true

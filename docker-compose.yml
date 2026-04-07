@@ -119,9 +119,9 @@ services:
       # Ephemeral VM manager pre-flight lab container: same Compose network + fixed DNS alias for probes.
       TELVM_LAB_DOCKER_NETWORK: telvm_default
       TELVM_LAB_DNS_ALIAS: telvm-lab-workload
-      # Optional LAN target for Companion.LanTarget + scripts/lan-host/test-lan-from-companion.sh (host .env).
-      TELVM_LAN_TARGET_HOST: ${TELVM_LAN_TARGET_HOST:-}
-      TELVM_LAN_TARGET_SSH_PORT: ${TELVM_LAN_TARGET_SSH_PORT:-22}
+      # Cluster: JSON array of node agent URLs (see agents/telvm-node-agent/README.md).
+      TELVM_CLUSTER_NODES: ${TELVM_CLUSTER_NODES:-}
+      TELVM_CLUSTER_TOKEN: ${TELVM_CLUSTER_TOKEN:-}
       # Optional: after publishing images/go-http-lab to GHCR, set in .env (see .env.example):
       # TELVM_LAB_IMAGE=ghcr.io/<your-org>/telvm-go-http-lab:main
       # TELVM_LAB_USE_IMAGE_CMD=1

@@ -59,6 +59,7 @@ config :phoenix,
   sort_verified_routes_query_params: true
 
 config :companion, :docker_adapter, Companion.Docker.Mock
+config :companion, :cluster_node_adapter, Companion.ClusterNode.Mock
 
 config :companion, Companion.GooseHealth, enabled: false
 

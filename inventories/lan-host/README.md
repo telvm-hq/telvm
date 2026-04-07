@@ -58,7 +58,13 @@ From the repo root on Windows:
 .\scripts\windows\test-lan-connectivity.ps1 -TargetIp 192.168.x.x
 ```
 
-## From the Dockerized Phoenix (`companion`) container
+## Cluster over HTTP (companion integration)
+
+Instead of raw TCP probes from the companion container, deploy the **[`telvm-node-agent`](../../agents/telvm-node-agent/README.md)** Zig binary to each host. The companion polls `GET /health` on each agent over HTTP; results appear on the **Pre-flight** page when `TELVM_CLUSTER_NODES` is set.
+
+See **[agents/telvm-node-agent/README.md](../../agents/telvm-node-agent/README.md)** for build, deploy, API, and systemd setup.
+
+## Shell probe from the companion container (legacy)
 
 With Compose running and `TELVM_LAN_TARGET_HOST` set (see root `.env.example`):
 
