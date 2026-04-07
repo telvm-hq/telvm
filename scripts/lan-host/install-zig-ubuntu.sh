@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # Install Zig on Ubuntu (x86_64) from the official tarball.
-# Used to build telvm-node-agent on remote lab hosts.
+# Queries ziglang.org/download/index.json for the real tarball URL so it works
+# across naming-scheme changes (0.13 used zig-linux-x86_64-*, 0.14+ uses zig-x86_64-linux-*).
 #
 # Usage:
-#   sudo bash scripts/lan-host/install-zig-ubuntu.sh
-#   sudo bash scripts/lan-host/install-zig-ubuntu.sh --version 0.14.1
-#   sudo bash scripts/lan-host/install-zig-ubuntu.sh --remove
+#   sudo bash install-zig-ubuntu.sh
+#   sudo bash install-zig-ubuntu.sh --version 0.14.1
+#   sudo bash install-zig-ubuntu.sh --remove
 set -euo pipefail
 
 ZIG_VERSION="${ZIG_VERSION:-0.15.2}"
 INSTALL_DIR="/opt"
 LINK="/usr/local/bin/zig"
+INDEX_URL="https://ziglang.org/download/index.json"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -21,7 +23,7 @@ while [[ $# -gt 0 ]]; do
     --remove)
       echo "==> Removing Zig from ${INSTALL_DIR} and ${LINK}"
       rm -f "${LINK}"
-      rm -rf "${INSTALL_DIR}"/zig-linux-x86_64-*
+      rm -rf "${INSTALL_DIR}"/zig-*-linux-* "${INSTALL_DIR}"/zig-linux-*
       echo "    done"
       exit 0
       ;;
@@ -45,9 +47,27 @@ if [[ "${ARCH}" != "x86_64" ]]; then
   exit 1
 fi
 
-TARBALL="zig-linux-x86_64-${ZIG_VERSION}.tar.xz"
-URL="https://ziglang.org/download/${ZIG_VERSION}/${TARBALL}"
-DEST="${INSTALL_DIR}/zig-linux-x86_64-${ZIG_VERSION}"
+echo "==> Resolving tarball URL for Zig ${ZIG_VERSION} (x86_64-linux) from index.json"
+URL="$(curl -sfL "${INDEX_URL}" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+v = d.get('${ZIG_VERSION}', {})
+entry = v.get('x86_64-linux', {})
+url = entry.get('tarball', '')
+if not url:
+    print('ERROR', file=sys.stderr)
+    sys.exit(1)
+print(url)
+")"
+
+if [[ -z "${URL}" ]]; then
+  echo "error: could not find tarball URL for Zig ${ZIG_VERSION} x86_64-linux" >&2
+  exit 1
+fi
+
+TARBALL="$(basename "${URL}")"
+DIRNAME="${TARBALL%.tar.xz}"
+DEST="${INSTALL_DIR}/${DIRNAME}"
 
 if [[ -d "${DEST}" ]]; then
   echo "==> Zig ${ZIG_VERSION} already installed at ${DEST}"
@@ -60,7 +80,6 @@ else
   rm -f "/tmp/${TARBALL}"
 fi
 
-# Remove any previous symlink (possibly to an older version)
 rm -f "${LINK}"
 ln -s "${DEST}/zig" "${LINK}"
 
