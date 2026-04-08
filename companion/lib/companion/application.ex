@@ -32,7 +32,7 @@ defmodule Companion.Application do
     url = Application.get_env(:companion, :network_agent_url, "")
 
     if is_binary(url) and url != "" do
-      [Companion.NetworkAgentPoller]
+      [Companion.NetworkAgentPoller, Companion.Docker.RemoteVerifier]
     else
       []
     end
