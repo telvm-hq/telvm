@@ -6,11 +6,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 
 <p align="center">
-  <img src="docs/assets/cluster-dashboard.png" alt="telvm companion dashboard showing 3 cluster nodes reporting ok, with pre-flight checks all passing" width="920" />
-</p>
-
-<p align="center">
-  <img src="docs/assets/TELVM_IMAGE_BANNER.png" alt="telvm: Docker runtimes, localhost:4000, /telvm/api, Machines and health, eel mascot" width="920" />
+  <img src="docs/assets/cluster-dashboard.png" alt="telvm companion Pre-flight dashboard with agent status cards, LAN hosts table, and gating checks" width="920" />
 </p>
 
 ### Architecture (overview)

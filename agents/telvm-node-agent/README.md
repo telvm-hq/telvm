@@ -1,5 +1,14 @@
 # telvm-node-agent
 
+```
+ _       _                              _       
+| |_ ___| |_   ___ __ ___   __  __  ___(_) __ _ 
+| __/ _ \ \ \ / / '_ ` _ \  \ \/ / |_  / |/ _` |
+| ||  __/ |\ V /| | | | | |  >  <   / /| | (_| |
+ \__\___|_| \_/ |_| |_| |_| /_/\_\ /___|_|\__, |
+                                           |___/
+```
+
 Minimal HTTP agent for remote Ubuntu machines in a telvm cluster. Runs as a static Linux binary, proxies a narrow slice of the local Docker Engine API, and exposes a health endpoint. The companion Phoenix app polls these agents over HTTP.
 
 ## Build

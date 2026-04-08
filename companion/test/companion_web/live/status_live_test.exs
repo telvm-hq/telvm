@@ -17,7 +17,7 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ ~s(href="/machines")
     assert html =~ ~s(href="/agent")
     assert html =~ "/health"
-    assert html =~ "telvm/api/fyi"
+    assert html =~ "api reference"
   end
 
   test "GET /topology redirects to /warm", %{conn: conn} do

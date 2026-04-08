@@ -1,5 +1,14 @@
 # telvm-network-agent
 
+```
+ _       _                                            _ 
+| |_ ___| |_   ___ __ ___   __  __  _ ____      _____| |
+| __/ _ \ \ \ / / '_ ` _ \  \ \/ / | '_ \ \ /\ / / __| |
+| ||  __/ |\ V /| | | | | |  >  <  | |_) \ V  V /\__ \ |
+ \__\___|_| \_/ |_| |_| |_| /_/\_\ | .__/ \_/\_/ |___/_|
+                                    |_|
+```
+
 Lightweight HTTP service that runs on the **Windows gateway PC** and exposes ICS
 (Internet Connection Sharing) state, LAN host discovery, and network diagnostics
 as JSON endpoints. Designed to be polled by the telvm companion dashboard — the
