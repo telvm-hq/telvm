@@ -4,7 +4,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import * as z from "zod";
-import { apiFetch, formatJsonBody, getBaseUrl, textResult } from "./api.js";
+import { apiFetch, formatJsonBody, getBaseUrl, getNetworkAgentUrl, networkAgentFetch, textResult } from "./api.js";
 
 function toolText(text: string) {
   return { content: [{ type: "text" as const, text }] };
@@ -193,6 +193,44 @@ async function main() {
       const r = await apiFetch(`/telvm/api/machines/${encodeURIComponent(id)}/unpause`, {
         method: "POST",
       });
+      return toolText(textResult(r.bodyText, r.status, r.ok));
+    }
+  );
+
+  // ── Network agent (ICS) tools ──────────────────────────────────────────────
+
+  server.registerTool(
+    "telvm_ics_status",
+    {
+      description:
+        "Get ICS (Internet Connection Sharing) status from the Windows gateway network agent. Returns adapter config, subnet, gateway IP. Requires TELVM_NETWORK_AGENT_URL.",
+    },
+    async () => {
+      const r = await networkAgentFetch("/ics/status");
+      return toolText(textResult(r.bodyText, r.status, r.ok));
+    }
+  );
+
+  server.registerTool(
+    "telvm_ics_hosts",
+    {
+      description:
+        "List hosts discovered on the ICS subnet (IP, MAC, state). Returns ARP/neighbor data from the Windows gateway. Requires TELVM_NETWORK_AGENT_URL.",
+    },
+    async () => {
+      const r = await networkAgentFetch("/ics/hosts");
+      return toolText(textResult(r.bodyText, r.status, r.ok));
+    }
+  );
+
+  server.registerTool(
+    "telvm_ics_diagnostics",
+    {
+      description:
+        "Full network diagnostics from the Windows gateway: adapters, routes, interfaces, reachability probes. Requires TELVM_NETWORK_AGENT_URL.",
+    },
+    async () => {
+      const r = await networkAgentFetch("/ics/diagnostics");
       return toolText(textResult(r.bodyText, r.status, r.ok));
     }
   );

@@ -29,25 +29,12 @@ config :companion, :inference_base_url,
 config :companion, :agent_default_model,
   System.get_env("TELVM_AGENT_DEFAULT_MODEL") || "qwen2.5:0.5b"
 
-cluster_nodes =
-  case System.get_env("TELVM_CLUSTER_NODES") do
-    json when is_binary(json) and json != "" ->
-      case Jason.decode(json) do
-        {:ok, list} when is_list(list) ->
-          Enum.map(list, fn entry ->
-            %{url: Map.get(entry, "url", ""), label: Map.get(entry, "label", "")}
-          end)
+# Network agent (PowerShell ICS service on the Windows gateway).
+# Discovers LAN hosts and probes each for a Zig node agent. Always enabled with a sensible default.
+config :companion, :network_agent_url,
+  System.get_env("TELVM_NETWORK_AGENT_URL") || "http://host.docker.internal:9225"
 
-        _ ->
-          []
-      end
-
-    _ ->
-      []
-  end
-
-config :companion, :cluster_nodes, cluster_nodes
-config :companion, :cluster_token, System.get_env("TELVM_CLUSTER_TOKEN") || ""
+config :companion, :network_agent_token, System.get_env("TELVM_NETWORK_AGENT_TOKEN") || ""
 
 # Use Docker Engine HTTP adapter when the Unix socket is present (e.g. docker compose).
 unless config_env() == :test do
