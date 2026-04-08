@@ -8,6 +8,48 @@ export function getBaseUrl(): string {
   return raw.replace(/\/$/, "");
 }
 
+export function getNetworkAgentUrl(): string {
+  const raw = process.env.TELVM_NETWORK_AGENT_URL ?? "";
+  return raw.replace(/\/$/, "");
+}
+
+export function getNetworkAgentToken(): string {
+  return process.env.TELVM_NETWORK_AGENT_TOKEN ?? "";
+}
+
+export async function networkAgentFetch(
+  path: string,
+  init?: RequestInit
+): Promise<ApiResult> {
+  const base = getNetworkAgentUrl();
+  if (!base) {
+    return {
+      ok: false,
+      status: 0,
+      bodyText: "TELVM_NETWORK_AGENT_URL not configured. Set it to the network agent base URL (e.g. http://192.168.137.1:9225).",
+    };
+  }
+  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  const token = getNetworkAgentToken();
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    ...((init?.headers as Record<string, string>) ?? {}),
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  try {
+    const res = await fetch(url, { ...init, headers });
+    const bodyText = await res.text();
+    return { ok: res.ok, status: res.status, bodyText };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `Cannot reach telvm network agent at ${base}: ${msg}. Is the PowerShell agent running?`
+    );
+  }
+}
+
 export type ApiResult = {
   ok: boolean;
   status: number;

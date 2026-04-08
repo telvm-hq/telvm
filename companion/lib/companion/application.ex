@@ -18,7 +18,7 @@ defmodule Companion.Application do
 
     children =
       base ++
-        cluster_children() ++
+        network_agent_children() ++
         [
           {Companion.GooseHealth, Application.get_env(:companion, Companion.GooseHealth, [])},
           CompanionWeb.Endpoint
@@ -28,9 +28,11 @@ defmodule Companion.Application do
     Supervisor.start_link(children, opts)
   end
 
-  defp cluster_children do
-    if Companion.ClusterNodesConfig.configured?() do
-      [Companion.ClusterNodePoller]
+  defp network_agent_children do
+    url = Application.get_env(:companion, :network_agent_url, "")
+
+    if is_binary(url) and url != "" do
+      [Companion.NetworkAgentPoller]
     else
       []
     end
