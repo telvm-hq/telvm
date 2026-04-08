@@ -12,8 +12,7 @@ defmodule CompanionWeb.StatusLive do
   alias Companion.InferenceChat
   alias Companion.GooseRuntime
   alias Companion.GooseHealth
-  alias Companion.ClusterNodePoller
-  alias Companion.ClusterNodesConfig
+  alias Companion.NetworkAgentPoller
 
   @default_entry LabCatalog.get(:cert_phoenix)
   @agent_chat_max_messages 40
@@ -77,8 +76,8 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:goose_logs_loading, false)
       |> assign(:goose_logs_error, nil)
       |> assign(:goose_health_snapshot, nil)
-      |> assign(:cluster_snapshot, [])
-      |> assign(:cluster_configured, ClusterNodesConfig.configured?())
+      |> assign(:network_agent_snapshot, nil)
+      |> assign(:fyi_expanded, false)
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Companion.PubSub, Preflight.topic())
@@ -87,9 +86,7 @@ defmodule CompanionWeb.StatusLive do
       Phoenix.PubSub.subscribe(Companion.PubSub, SoakRunner.topic())
       Phoenix.PubSub.subscribe(Companion.PubSub, GooseHealth.topic())
 
-      if ClusterNodesConfig.configured?() do
-        Phoenix.PubSub.subscribe(Companion.PubSub, ClusterNodePoller.topic())
-      end
+      Phoenix.PubSub.subscribe(Companion.PubSub, NetworkAgentPoller.topic())
 
       if socket.assigns.live_action == :agent_setup do
         send(self(), :load_goose_panel)
@@ -185,8 +182,8 @@ defmodule CompanionWeb.StatusLive do
     {:noreply, assign(socket, :report, report)}
   end
 
-  def handle_info({:cluster_snapshot, results}, socket) when is_list(results) do
-    {:noreply, assign(socket, :cluster_snapshot, results)}
+  def handle_info({:network_agent_snapshot, snapshot}, socket) when is_map(snapshot) do
+    {:noreply, assign(socket, :network_agent_snapshot, snapshot)}
   end
 
   def handle_info({:vm_manager_preflight, {:line, kind, ts, text}}, socket) do
@@ -485,6 +482,10 @@ defmodule CompanionWeb.StatusLive do
   # --- Events: select image from catalog ---
 
   @impl true
+  def handle_event("toggle_fyi", _, socket) do
+    {:noreply, assign(socket, :fyi_expanded, !socket.assigns.fyi_expanded)}
+  end
+
   def handle_event("select_image", %{"id" => id_str}, socket) do
     entry =
       try do
@@ -2434,7 +2435,90 @@ defmodule CompanionWeb.StatusLive do
         telvm · OSS
       </div>
 
-      <div class="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+      <div class="flex flex-wrap gap-3 mb-5">
+        <div class="telvm-panel-border border rounded p-3 space-y-2" style="width: 300px;">
+          <div class="flex items-baseline gap-2">
+            <span class="text-xs font-semibold" style="color: var(--telvm-shell-fg);">
+              telvm companion
+            </span>
+            <span class="text-[10px] font-mono" style="color: var(--telvm-shell-muted);">
+              Docker
+            </span>
+          </div>
+          <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono">
+            <span style="color: var(--telvm-shell-muted);">status</span>
+            <span class="telvm-text-ok">running</span>
+            <span style="color: var(--telvm-shell-muted);">engine</span>
+            <span style="color: var(--telvm-shell-fg);">
+              {engine_version_from_report(@report)}
+            </span>
+            <span style="color: var(--telvm-shell-muted);">socket</span>
+            <span style="color: var(--telvm-shell-fg);">/var/run/docker.sock</span>
+            <span style="color: var(--telvm-shell-muted);">API</span>
+            <span class="telvm-accent-dim-text">:4000/telvm/api</span>
+            <span style="color: var(--telvm-shell-muted);">MCP transport</span>
+            <span style="color: var(--telvm-shell-fg);">stdio</span>
+          </div>
+        </div>
+
+        <div class="telvm-panel-border border rounded p-3 space-y-2" style="width: 300px;">
+          <div class="flex items-baseline gap-2">
+            <span class="text-xs font-semibold" style="color: var(--telvm-shell-fg);">
+              telvm-network-agent
+            </span>
+            <span class="text-[10px] font-mono" style="color: var(--telvm-shell-muted);">
+              PowerShell
+            </span>
+          </div>
+          <div
+            :if={@network_agent_snapshot && @network_agent_snapshot.health.status == :ok}
+            class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono"
+          >
+            <span style="color: var(--telvm-shell-muted);">status</span>
+            <span class="telvm-text-ok">ok</span>
+            <span style="color: var(--telvm-shell-muted);">hostname</span>
+            <span style="color: var(--telvm-shell-fg);">
+              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["hostname"]) || "?"}
+            </span>
+            <span style="color: var(--telvm-shell-muted);">version</span>
+            <span style="color: var(--telvm-shell-fg);">
+              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["version"]) || "?"}
+            </span>
+            <span style="color: var(--telvm-shell-muted);">role</span>
+            <span style="color: var(--telvm-shell-fg);">NAT gateway + DHCP</span>
+            <span style="color: var(--telvm-shell-muted);">gateway IP</span>
+            <span class="telvm-accent-dim-text">
+              {@network_agent_snapshot.ics_status["gateway_ip"] || "?"}
+            </span>
+            <span style="color: var(--telvm-shell-muted);">subnet</span>
+            <span class="telvm-accent-dim-text">
+              {@network_agent_snapshot.ics_status["subnet"] || "?"}
+            </span>
+            <span style="color: var(--telvm-shell-muted);">uplink</span>
+            <span style="color: var(--telvm-shell-fg);">
+              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["ics"] && @network_agent_snapshot.health.data["ics"]["public_adapter"]) || "?"}
+              {if @network_agent_snapshot.health.data && @network_agent_snapshot.health.data["uplink_reachable"], do: " (online)", else: " (offline)"}
+            </span>
+            <span style="color: var(--telvm-shell-muted);">private NIC</span>
+            <span style="color: var(--telvm-shell-fg);">
+              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["ics"] && @network_agent_snapshot.health.data["ics"]["private_adapter"]) || "?"}
+            </span>
+            <span style="color: var(--telvm-shell-muted);">API</span>
+            <span class="telvm-accent-dim-text">:9225</span>
+          </div>
+          <div
+            :if={is_nil(@network_agent_snapshot) || @network_agent_snapshot.health.status != :ok}
+            class="text-[11px] font-mono"
+            style="color: var(--telvm-shell-muted);"
+          >
+            <span class="telvm-text-danger-ink">unreachable</span>
+            <span> - start with </span>
+            <code class="telvm-accent-dim-text">Start-NetworkAgent.ps1</code>
+          </div>
+        </div>
+      </div>
+
+      <div>
         <div class="min-w-0 space-y-5">
           <div id="preflight-rollup" data-rollup={to_string(@report.rollup)} class="mb-4 space-y-1">
             <div class="font-semibold" style="color: var(--telvm-shell-fg);">pre-flight</div>
@@ -2455,66 +2539,142 @@ defmodule CompanionWeb.StatusLive do
             </div>
           </div>
 
-          <section :if={@cluster_configured} class="mb-5" id="cluster-nodes-section">
+          <section class="mb-5" id="lan-hosts-section">
             <div
               class="text-[11px] uppercase tracking-wide mb-1 font-semibold"
               style="color: var(--telvm-shell-muted);"
             >
-              cluster nodes
+              lan hosts
             </div>
 
             <p class="text-xs mb-2 leading-relaxed max-w-2xl" style="color: var(--telvm-shell-muted);">
-              HTTP health from remote
-              <span class="font-mono telvm-accent-dim-text">telvm-node-agent</span>
-              instances. PubSub
-              <span class="font-mono telvm-accent-dim-text">cluster_nodes:updates</span>
-              · <span class="font-mono telvm-accent-dim-text">Companion.ClusterNodePoller</span>
+              ICS gateway discovery via
+              <span class="font-mono telvm-accent-dim-text">telvm-network-agent</span>
+              + Zig agent probe on
+              <span class="font-mono telvm-accent-dim-text">:9100/health</span>.
+              PubSub
+              <span class="font-mono telvm-accent-dim-text">network_agent:updates</span>
+              · <span class="font-mono telvm-accent-dim-text">Companion.NetworkAgentPoller</span>
             </p>
 
             <div
-              :if={@cluster_snapshot == []}
+              :if={is_nil(@network_agent_snapshot)}
               class="text-xs font-mono py-2"
               style="color: var(--telvm-shell-muted);"
             >
-              Waiting for first poll…
+              Waiting for first poll from network agent...
             </div>
 
-            <div
-              :if={@cluster_snapshot != []}
-              class="overflow-x-auto telvm-panel-border border"
-            >
-              <div class="grid grid-cols-12 gap-x-2 px-2 py-1 text-[10px] uppercase tracking-wide telvm-term-header">
-                <span class="col-span-3">label</span>
-                <span class="col-span-2">status</span>
-                <span class="col-span-3">hostname</span>
-                <span class="col-span-2">docker</span>
-                <span class="col-span-2">checked</span>
-              </div>
-              <div :for={node <- @cluster_snapshot} class="term-row">
-                <div class="col-span-3 font-mono text-xs truncate" title={node.url}>
-                  {node.label}
-                </div>
-                <div class="col-span-2">
-                  <span :if={node.status == :ok} class="text-xs font-mono telvm-text-ok">ok</span>
-                  <span :if={node.status == :unreachable} class="text-xs font-mono telvm-text-danger-ink">
-                    unreachable
-                  </span>
-                  <span :if={node.status == :timeout} class="text-xs font-mono telvm-text-danger-ink">
-                    timeout
-                  </span>
-                </div>
-                <div class="col-span-3 font-mono text-xs truncate" style="color: var(--telvm-shell-muted);">
-                  {if node.health, do: node.health["hostname"] || "—", else: "—"}
-                </div>
-                <div class="col-span-2 font-mono text-xs" style="color: var(--telvm-shell-muted);">
-                  {if node.health, do: (if node.health["docker_reachable"], do: "yes", else: "no"), else: "—"}
-                </div>
-                <div
-                  class="col-span-2 text-xs font-mono tabular-nums"
-                  style="color: var(--telvm-shell-muted);"
+            <div :if={@network_agent_snapshot} class="space-y-2">
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+                <span style="color: var(--telvm-shell-muted);">gateway agent</span>
+                <span
+                  :if={@network_agent_snapshot.health.status == :ok}
+                  class="font-mono telvm-text-ok"
                 >
-                  {Calendar.strftime(node.checked_at, "%H:%M:%S")}
+                  ok
+                </span>
+                <span
+                  :if={@network_agent_snapshot.health.status != :ok}
+                  class="font-mono telvm-text-danger-ink"
+                >
+                  unreachable
+                </span>
+                <span style="color: var(--telvm-shell-muted);">·</span>
+                <span class="font-mono tabular-nums" style="color: var(--telvm-shell-muted);">
+                  {Calendar.strftime(@network_agent_snapshot.checked_at, "%H:%M:%S")}
+                </span>
+                <span style="color: var(--telvm-shell-muted);">·</span>
+                <span class="font-mono" style="color: var(--telvm-shell-muted);">
+                  {@network_agent_snapshot.host_count} host(s) on wire
+                </span>
+              </div>
+
+              <div
+                :if={@network_agent_snapshot.ics_status != %{}}
+                class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-mono py-1 px-2 rounded telvm-panel-border border"
+                style="color: var(--telvm-shell-muted);"
+              >
+                <span>
+                  Gateway: <span class="telvm-accent-dim-text">{@network_agent_snapshot.ics_status["gateway_ip"] || "?"}</span>
+                  <span style="opacity:0.5">(this PC)</span>
+                </span>
+                <span>
+                  Subnet: <span class="telvm-accent-dim-text">{@network_agent_snapshot.ics_status["subnet"] || "?"}</span>
+                </span>
+                <span>
+                  DHCP: <span class="telvm-accent-dim-text">ICS (Windows)</span>
+                </span>
+                <span>
+                  Uplink: <span class="telvm-accent-dim-text">{@network_agent_snapshot.ics_status["public_adapter"] || "?"}</span>
+                </span>
+              </div>
+
+              <div
+                :if={@network_agent_snapshot.hosts != []}
+                class="overflow-x-auto telvm-panel-border border"
+              >
+                <div class="grid grid-cols-12 gap-x-2 px-2 py-1 text-[10px] uppercase tracking-wide telvm-term-header">
+                  <span class="col-span-2">ip</span>
+                  <span class="col-span-3">mac</span>
+                  <span class="col-span-2">arp</span>
+                  <span class="col-span-2">zig agent</span>
+                  <span class="col-span-3">hostname</span>
                 </div>
+                <div :for={host <- @network_agent_snapshot.hosts} class="term-row">
+                  <div class="col-span-2 font-mono text-xs" style="color: var(--telvm-shell-fg);">
+                    {host["ip"]}
+                  </div>
+                  <div class="col-span-3 font-mono text-xs truncate" style="color: var(--telvm-shell-muted);">
+                    {host["mac"]}
+                  </div>
+                  <div class="col-span-2 text-xs">
+                    <span
+                      :if={host["state"] in ["Permanent", "Reachable"]}
+                      class="font-mono telvm-text-ok text-[11px]"
+                    >
+                      {host["state"]}
+                    </span>
+                    <span
+                      :if={host["state"] not in ["Permanent", "Reachable"]}
+                      class="font-mono telvm-text-warn text-[11px]"
+                    >
+                      {host["state"] || "?"}
+                    </span>
+                  </div>
+                  <div class="col-span-2 text-xs">
+                    <span
+                      :if={host["zig_agent_status"] == "ok"}
+                      class="font-mono telvm-text-ok font-bold text-[11px]"
+                    >
+                      ok
+                    </span>
+                    <span
+                      :if={host["zig_agent_status"] == "unreachable"}
+                      class="font-mono telvm-text-danger-ink text-[11px]"
+                    >
+                      no agent
+                    </span>
+                    <span
+                      :if={host["zig_agent_status"] not in ["ok", "unreachable"]}
+                      class="font-mono text-[11px]"
+                      style="color: var(--telvm-shell-muted);"
+                    >
+                      {host["zig_agent_status"] || "?"}
+                    </span>
+                  </div>
+                  <div class="col-span-3 font-mono text-xs truncate" style="color: var(--telvm-shell-muted);">
+                    {(host["zig_agent_health"] && host["zig_agent_health"]["hostname"]) || "-"}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                :if={@network_agent_snapshot.hosts == []}
+                class="text-xs font-mono py-1"
+                style="color: var(--telvm-shell-muted);"
+              >
+                No hosts discovered on ICS subnet yet. Ensure cluster machines are powered on and connected to the switch.
               </div>
             </div>
           </section>
@@ -2623,19 +2783,22 @@ defmodule CompanionWeb.StatusLive do
           </section>
         </div>
 
-        <div class="mt-6 lg:mt-0 min-w-0">
-          <div
-            class="text-[11px] uppercase tracking-wide mb-2"
-            style="color: var(--telvm-shell-muted);"
-          >
-            agent API · FYI
-          </div>
+      </div>
 
+      <div class="mt-4">
+        <button
+          phx-click="toggle_fyi"
+          class="flex items-center gap-1 text-[11px] uppercase tracking-wide cursor-pointer"
+          style="color: var(--telvm-shell-muted); background: none; border: none; padding: 0;"
+        >
+          <span>{if @fyi_expanded, do: "▾", else: "▸"}</span>
+          <span>api reference</span>
+        </button>
+        <div :if={@fyi_expanded} class="mt-2">
           <p class="text-xs mb-2" style="color: var(--telvm-shell-muted);">
             Markdown served from <code class="telvm-accent-dim-text">GET /telvm/api/fyi</code>
             — same origin as the control plane.
           </p>
-
           <iframe
             src={~p"/telvm/api/fyi"}
             class="w-full min-h-[24rem] rounded telvm-panel-border border bg-black/30"
@@ -3024,6 +3187,21 @@ defmodule CompanionWeb.StatusLive do
 
   defp gating_checks(%{checks: checks}), do: Enum.filter(checks, &(&1.kind == :gating))
   defp info_checks(%{checks: checks}), do: Enum.filter(checks, &(&1.kind == :info))
+
+  defp engine_version_from_report(%{checks: checks}) do
+    case Enum.find(checks, &(&1.id == :docker_engine)) do
+      %{status: :pass, detail: detail} ->
+        case Regex.run(~r/Engine\s+([\d.]+)/, detail) do
+          [_, version] -> version
+          _ -> "connected"
+        end
+
+      _ ->
+        "n/a"
+    end
+  end
+
+  defp engine_version_from_report(_), do: "n/a"
 
   defp rollup_label(:ready), do: "READY"
   defp rollup_label(:degraded), do: "DEGRADED"
