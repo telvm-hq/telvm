@@ -1,0 +1,25 @@
+# ICS DHCP: persistent IPv4 via Windows Internet Connection Sharing.
+#
+# Windows ICS assigns 192.168.137.x addresses from its built-in DHCP server
+# on the private (Ethernet) adapter. This netplan config tells the Ubuntu
+# node to request an address via DHCPv4 on its wired NIC.
+#
+# Usage:
+#   1. Find your Ethernet interface name:  ip -br link
+#      (common names: eno1, enp0s31f6, enp2s0, enp3s0)
+#   2. Replace "eno1" below with your actual interface name.
+#   3. Install and apply:
+#        sudo install -m 600 -T netplan-ics-dhcp.example.yaml /etc/netplan/99-ics-dhcp.yaml
+#        sudo netplan apply
+#   4. Verify:  ip -br a   (should show 192.168.137.x on that interface)
+#
+# Or use the helper script:
+#   bash scripts/lan-host/apply-ics-dhcp.sh
+#
+# This survives reboot. ICS does not serve DHCPv6, so dhcp6 is disabled.
+network:
+  version: 2
+  ethernets:
+    eno1:
+      dhcp4: true
+      dhcp6: false

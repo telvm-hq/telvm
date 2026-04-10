@@ -1,5 +1,6 @@
 const std = @import("std");
 const health = @import("health.zig");
+const network = @import("network.zig");
 const docker_proxy = @import("docker_proxy.zig");
 
 pub fn route(alloc: std.mem.Allocator, req: *std.http.Server.Request) !void {
@@ -8,6 +9,11 @@ pub fn route(alloc: std.mem.Allocator, req: *std.http.Server.Request) !void {
 
     if (std.mem.eql(u8, path, "/health")) {
         try health.handle(req);
+        return;
+    }
+
+    if (std.mem.eql(u8, path, "/network")) {
+        try network.handle(req);
         return;
     }
 

@@ -4,10 +4,41 @@ Use this folder to store a **factual snapshot** of each Ubuntu (or other) machin
 
 For **Wi-Fi vs direct Ethernet, APIPA, routing, and SSH** (how this fits real bring-up), see the primer: [LAN / Wi-Fi / Ethernet / SSH](../../docs/lan-cluster-network-primer.md).
 
+## Network addressing paths
+
+### Path A: Windows ICS (192.168.137.0/24) -- recommended for quick setups
+
+Windows ICS shares internet from Wi-Fi to Ethernet and runs a built-in DHCP server on **192.168.137.0/24**. Each Ubuntu node just needs `dhcp4: true` on its wired NIC.
+
+**One-command setup** (on each Ubuntu node, as root):
+
+```bash
+sudo bash scripts/lan-host/apply-ics-dhcp.sh
+```
+
+This auto-detects the wired NIC, writes `/etc/netplan/99-ics-dhcp.yaml`, and applies it. The address **persists across reboots**. Override the NIC name if needed:
+
+```bash
+sudo bash scripts/lan-host/apply-ics-dhcp.sh enp0s31f6
+```
+
+Manual alternative: copy the example and edit the interface name:
+
+- [netplan-ics-dhcp.example.yaml](netplan-ics-dhcp.example.yaml)
+
+```bash
+sudo install -m 600 -T netplan-ics-dhcp.example.yaml /etc/netplan/99-ics-dhcp.yaml
+sudo netplan apply
+```
+
+### Path B: UniFi / static lab (10.10.10.x)
+
 For **UniFi gateway + DHCP DNS** and **static Netplan** on **10.10.10.11 / .12**, see [UniFi + Netplan lab runbook](../../docs/lan-unifi-netplan-lab-runbook.md). Example files (copy to `/etc/netplan/`, mode **600**):
 
 - [netplan-10.10.10.11.example.yaml](netplan-10.10.10.11.example.yaml)
 - [netplan-10.10.10.12.example.yaml](netplan-10.10.10.12.example.yaml)
+
+> **Do not mix paths.** ICS uses 192.168.137.x; UniFi/static uses 10.10.10.x. Pick one per deployment.
 
 ## Golden host profile (reproduce on a fresh install)
 
