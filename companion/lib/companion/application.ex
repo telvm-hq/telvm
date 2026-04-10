@@ -24,7 +24,7 @@ defmodule Companion.Application do
           CompanionWeb.Endpoint
         ]
 
-    opts = [strategy: :rest_for_one, name: Companion.Supervisor]
+    opts = [strategy: :one_for_one, name: Companion.Supervisor]
     Supervisor.start_link(children, opts)
   end
 
