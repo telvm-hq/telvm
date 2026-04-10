@@ -47,6 +47,20 @@ defmodule Companion.NetworkAgentPoller do
 
   @impl true
   def handle_info(:tick, state) do
+    try do
+      run_tick(state)
+    rescue
+      e ->
+        Logger.error(
+          "[NetworkAgentPoller] tick failed: #{Exception.format(:error, e, __STACKTRACE__)}"
+        )
+
+        Process.send_after(self(), :tick, state.interval)
+        {:noreply, state}
+    end
+  end
+
+  defp run_tick(state) do
     url = network_agent_url()
     token = network_agent_token()
     adapter = Companion.NetworkAgent.impl()
@@ -66,7 +80,7 @@ defmodule Companion.NetworkAgentPoller do
 
     raw_hosts =
       case adapter.ics_hosts(url, token) do
-        {:ok, data} -> data["hosts"] || []
+        {:ok, data} -> normalize_hosts(Map.get(data, "hosts"))
         {:error, _} -> []
       end
 
@@ -91,6 +105,8 @@ defmodule Companion.NetworkAgentPoller do
     Process.send_after(self(), :tick, state.interval)
     {:noreply, %{state | last_snapshot: snapshot, last_run_at: checked_at}}
   end
+
+  defp normalize_hosts(raw), do: Companion.NetworkAgentHosts.normalize(raw)
 
   defp probe_zig_agents(hosts) when is_list(hosts) do
     hosts
