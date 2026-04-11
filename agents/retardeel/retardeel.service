@@ -1,0 +1,12 @@
+[Unit]
+Description=retardeel — filesystem agent for telvm workspaces
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/retardeel.env
+ExecStart=/usr/local/bin/retardeel --token ${RETARDEEL_TOKEN} --root ${RETARDEEL_ROOT} --port ${RETARDEEL_PORT}
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

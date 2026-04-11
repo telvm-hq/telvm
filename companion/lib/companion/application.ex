@@ -21,6 +21,7 @@ defmodule Companion.Application do
         network_agent_children() ++
         [
           {Companion.GooseHealth, Application.get_env(:companion, Companion.GooseHealth, [])},
+          Companion.RetardeelVerifier,
           CompanionWeb.Endpoint
         ]
 

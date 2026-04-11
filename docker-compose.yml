@@ -108,6 +108,8 @@ services:
       - ./images:/images:ro
       # LAN connectivity + inventory scripts (see inventories/lan-host/README.md).
       - ./scripts:/telvm-scripts:ro
+      # Zig agent source for in-container `docker build` (retardeel verifier).
+      - ./agents:/agents:ro
     ports:
       - "4000:4000"
     environment:

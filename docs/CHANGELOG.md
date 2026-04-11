@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 No breaking changes to the **Machine API** (`/telvm/api`) or to **ProxyPlug** / lab **Verify** flows.
 
+### retardeel -- Zig filesystem agent (v0.1.0)
+
+- **New agent:** `agents/retardeel/` -- static Zig binary for jailed filesystem operations (health, workspace discovery, stat, read, write, list) with Bearer auth and path jailing.
+- **Dockerfile:** multi-stage Alpine + Zig 0.13 build; no host toolchain required.
+- **RetardeelVerifier:** companion GenServer that builds the image, injects the binary into a sandbox container, and runs 11 endpoint checks (TDD-style, manual trigger from Agent setup).
+- **Agent setup UI:** "Verify retardeel" button with PASS/FAIL/SKIP results panel.
+- **Infra:** Docker CLI added to companion image; `./agents` mounted read-only into the companion container.
+
 ## [1.1.0] — 2026-03-31
 
 Major companion **operator UI** refresh. Full narrative for maintainers and GitHub Releases: [`releases/v1.1.0.md`](releases/v1.1.0.md).
