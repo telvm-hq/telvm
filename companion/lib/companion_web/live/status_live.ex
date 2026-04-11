@@ -78,6 +78,8 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:goose_health_snapshot, nil)
       |> assign(:network_agent_snapshot, nil)
       |> assign(:fyi_expanded, false)
+      |> assign(:retardeel_verify_status, :idle)
+      |> assign(:retardeel_verify_results, nil)
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Companion.PubSub, Preflight.topic())
@@ -87,6 +89,7 @@ defmodule CompanionWeb.StatusLive do
       Phoenix.PubSub.subscribe(Companion.PubSub, GooseHealth.topic())
 
       Phoenix.PubSub.subscribe(Companion.PubSub, NetworkAgentPoller.topic())
+      Phoenix.PubSub.subscribe(Companion.PubSub, Companion.RetardeelVerifier.topic())
 
       if socket.assigns.live_action == :agent_setup do
         send(self(), :load_goose_panel)
@@ -418,6 +421,17 @@ defmodule CompanionWeb.StatusLive do
   def handle_info({:goose_health, snap}, socket) do
     if socket.assigns.live_action == :agent_setup do
       {:noreply, assign(socket, :goose_health_snapshot, snap)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_info({:retardeel_verify, payload}, socket) do
+    if socket.assigns.live_action == :agent_setup do
+      {:noreply,
+       socket
+       |> assign(:retardeel_verify_status, payload.status)
+       |> assign(:retardeel_verify_results, payload.results)}
     else
       {:noreply, socket}
     end
@@ -986,6 +1000,27 @@ defmodule CompanionWeb.StatusLive do
     end
   end
 
+  # --- Events: retardeel verifier ---
+
+  @impl true
+  def handle_event("verify_retardeel", _params, socket) do
+    cond do
+      socket.assigns.live_action != :agent_setup ->
+        {:noreply, socket}
+
+      socket.assigns.retardeel_verify_status == :running ->
+        {:noreply, put_flash(socket, :info, "Verification already running.")}
+
+      true ->
+        Companion.RetardeelVerifier.verify()
+
+        {:noreply,
+         socket
+         |> assign(:retardeel_verify_status, :running)
+         |> assign(:retardeel_verify_results, nil)}
+    end
+  end
+
   # --- Events: destroy all lab containers ---
 
   @impl true
@@ -1432,6 +1467,76 @@ defmodule CompanionWeb.StatusLive do
             >{@goose_logs_text || ""}</pre>
           </aside>
 
+          <aside
+            class="min-w-0 rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4"
+            id="agent-retardeel-panel"
+          >
+            <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] mb-2 font-semibold">
+              retardeel · filesystem agent verifier
+            </div>
+            <p class="text-[10px] mb-3" style="color: var(--telvm-shell-muted);">
+              Builds the retardeel Zig binary via Docker, injects it into the sandbox container
+              (<span class="font-mono telvm-accent-dim-text">telvm.sandbox=true</span>),
+              and runs endpoint checks: health, workspace, stat, read, write, list, jail escape, auth.
+            </p>
+            <div class="flex flex-wrap gap-2 mb-3">
+              <button
+                type="button"
+                phx-click="verify_retardeel"
+                phx-disable-with="verifying…"
+                disabled={@retardeel_verify_status == :running}
+                class={[
+                  "px-3 py-2 text-[10px] sm:text-xs font-mono font-semibold rounded-md border uppercase tracking-wide",
+                  @retardeel_verify_status == :running &&
+                    "cursor-not-allowed opacity-60 border-zinc-700",
+                  @retardeel_verify_status != :running && "telvm-btn-primary"
+                ]}
+              >
+                {if @retardeel_verify_status == :running, do: "Verifying…", else: "Verify retardeel"}
+              </button>
+            </div>
+
+            <div
+              :if={@retardeel_verify_status == :running && @retardeel_verify_results == nil}
+              class="text-[10px] font-mono telvm-accent-dim-text animate-pulse"
+            >
+              Building image, injecting binary, running checks…
+            </div>
+
+            <div :if={is_list(@retardeel_verify_results)} class="space-y-1">
+              <div
+                :for={{name, status, detail} <- @retardeel_verify_results}
+                class="flex items-baseline gap-2 text-[10px] font-mono"
+              >
+                <span class={retardeel_status_class(status)}>
+                  {retardeel_status_tag(status)}
+                </span>
+                <span style="color: var(--telvm-shell-fg);">{name}</span>
+                <span
+                  class="truncate max-w-[14rem]"
+                  style="color: var(--telvm-shell-muted);"
+                  title={detail}
+                >
+                  {detail}
+                </span>
+              </div>
+
+              <div class="mt-2 pt-2 border-t text-[10px] font-mono" style="border-color: var(--telvm-shell-border);">
+                <span class="telvm-text-ok">
+                  {Enum.count(@retardeel_verify_results, fn {_, s, _} -> s == :pass end)} PASS
+                </span>
+                <span class="mx-1" style="color: var(--telvm-shell-muted);">·</span>
+                <span class="telvm-text-danger-ink">
+                  {Enum.count(@retardeel_verify_results, fn {_, s, _} -> s == :fail end)} FAIL
+                </span>
+                <span class="mx-1" style="color: var(--telvm-shell-muted);">·</span>
+                <span style="color: var(--telvm-shell-muted);">
+                  {Enum.count(@retardeel_verify_results, fn {_, s, _} -> s == :skip end)} SKIP
+                </span>
+              </div>
+            </div>
+          </aside>
+
           <section class="text-[10px] leading-relaxed" style="color: var(--telvm-shell-muted);">
             <span class="telvm-accent-dim-text font-semibold uppercase tracking-[0.12em]">
               Weights
@@ -1750,6 +1855,16 @@ defmodule CompanionWeb.StatusLive do
   defp goose_health_agent_txt({:error, msg}) do
     "ERR " <> String.slice(to_string(msg), 0, 44)
   end
+
+  defp retardeel_status_tag(:pass), do: "PASS"
+  defp retardeel_status_tag(:fail), do: "FAIL"
+  defp retardeel_status_tag(:skip), do: "SKIP"
+  defp retardeel_status_tag(_), do: "—"
+
+  defp retardeel_status_class(:pass), do: "telvm-text-ok font-semibold w-8"
+  defp retardeel_status_class(:fail), do: "telvm-text-danger-ink font-semibold w-8"
+  defp retardeel_status_class(:skip), do: "w-8"
+  defp retardeel_status_class(_), do: "w-8"
 
   defp trim_chat_messages(msgs, max) when is_list(msgs) and max > 0 do
     if length(msgs) <= max, do: msgs, else: Enum.take(msgs, -max)
