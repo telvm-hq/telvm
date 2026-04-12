@@ -14,8 +14,10 @@ defmodule Companion.Topology.AsciiTest do
     assert out =~ "Resource is still in use"
   end
 
-  test "warm_blueprint empty labs message" do
-    assert Ascii.warm_blueprint([], {:ok, []}) =~ "no lab containers yet"
+  test "warm_blueprint empty stack and warm rows show discovery hints" do
+    out = Ascii.warm_blueprint([], {:ok, []})
+    assert out =~ "com.docker.compose.project=telvm"
+    assert out =~ "no warm rows yet"
   end
 
   test "warm_blueprint with lab machines chunks five per row" do
