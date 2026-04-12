@@ -19,6 +19,7 @@ defmodule Companion.Application do
     children =
       base ++
         network_agent_children() ++
+        egress_proxy_children() ++
         [
           {Companion.GooseHealth, Application.get_env(:companion, Companion.GooseHealth, [])},
           Companion.RetardeelVerifier,
@@ -34,6 +35,16 @@ defmodule Companion.Application do
 
     if is_binary(url) and url != "" do
       [Companion.NetworkAgentPoller, Companion.Docker.RemoteVerifier]
+    else
+      []
+    end
+  end
+
+  defp egress_proxy_children do
+    cfg = Application.get_env(:companion, Companion.EgressProxy) || []
+
+    if Keyword.get(cfg, :enabled, false) do
+      [{Companion.EgressProxy.Supervisor, []}]
     else
       []
     end

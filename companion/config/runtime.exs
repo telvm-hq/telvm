@@ -20,12 +20,12 @@ if System.get_env("PHX_SERVER") do
   config :companion, CompanionWeb.Endpoint, server: true
 end
 
-# OpenAI-compatible inference base URL for Agent setup (include /v1). Override with TELVM_INFERENCE_BASE_URL.
+# OpenAI-compatible inference base URL for OSS Agents (include /v1). Override with TELVM_INFERENCE_BASE_URL.
 config :companion, :inference_base_url,
   System.get_env("TELVM_INFERENCE_BASE_URL") ||
     Application.get_env(:companion, :default_inference_base_url)
 
-# Default model id for Agent setup "Model" tab auto-session (must exist on the inference server). Override with TELVM_AGENT_DEFAULT_MODEL.
+# Default model id for OSS Agents "Model" tab auto-session (must exist on the inference server). Override with TELVM_AGENT_DEFAULT_MODEL.
 config :companion, :agent_default_model,
   System.get_env("TELVM_AGENT_DEFAULT_MODEL") || "qwen2.5:0.5b"
 
@@ -35,6 +35,41 @@ config :companion, :network_agent_url,
   System.get_env("TELVM_NETWORK_AGENT_URL") || "http://host.docker.internal:9225"
 
 config :companion, :network_agent_token, System.get_env("TELVM_NETWORK_AGENT_TOKEN") || ""
+
+# Per-workload HTTP egress proxy (CONNECT + allowlisted GET). Disabled in :test regardless of env.
+{egress_enabled, egress_workloads} =
+  if config_env() == :test do
+    {false, []}
+  else
+    raw =
+      case System.get_env("TELVM_EGRESS_WORKLOADS_FILE") do
+        p when is_binary(p) and p != "" ->
+          case File.read(p) do
+            {:ok, body} -> body
+            _ -> "[]"
+          end
+
+        _ ->
+          System.get_env("TELVM_EGRESS_WORKLOADS") || "[]"
+      end
+
+    workloads =
+      raw
+      |> Companion.EgressProxy.Workloads.parse_json()
+      |> Companion.EgressProxy.Workloads.attach_secrets()
+
+    enabled =
+      case System.get_env("TELVM_EGRESS_ENABLED") do
+        v when v in ~w(1 true TRUE True yes YES) -> true
+        _ -> false
+      end
+
+    {enabled, workloads}
+  end
+
+config :companion, Companion.EgressProxy,
+  enabled: egress_enabled,
+  workloads: egress_workloads
 
 # Use Docker Engine HTTP adapter when the Unix socket is present (e.g. docker compose).
 unless config_env() == :test do
