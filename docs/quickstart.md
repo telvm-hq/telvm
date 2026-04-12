@@ -6,6 +6,8 @@
 
 Prerequisites: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or a compatible Engine).
 
+If you use **closed-agent upstream submodules** (`third_party/claude-code`, `third_party/codex`), initialize them after clone: `git submodule update --init --recursive` (see [CONTRIBUTING — Git submodules](CONTRIBUTING.md#git-submodules-closed-agent-upstream-trees)).
+
 ```bash
 docker compose up --build
 ```
@@ -86,6 +88,17 @@ docker pull ghcr.io/telvm-hq/telvm-go-http-lab:main
 ```
 
 After the first successful publish, the package appears under the org’s **Packages**. For **private** packages, run `docker login ghcr.io` on the host whose Engine backs `docker.sock`.
+
+### Closed-agent images (Claude Code / Codex CLI)
+
+GitHub Actions publish **`ghcr.io/<lowercase-owner>/telvm-closed-claude`** and **`ghcr.io/<lowercase-owner>/telvm-closed-codex`** when `images/telvm-closed-*` or the corresponding `third_party/*` submodule pointer changes on `main` (workflows: [`publish-telvm-closed-claude.yml`](../.github/workflows/publish-telvm-closed-claude.yml), [`publish-telvm-closed-codex.yml`](../.github/workflows/publish-telvm-closed-codex.yml)). Tags: **`main`**, commit SHA.
+
+```bash
+docker pull ghcr.io/telvm-hq/telvm-closed-claude:main
+docker pull ghcr.io/telvm-hq/telvm-closed-codex:main
+```
+
+Build locally from repo root: see [`images/telvm-closed-claude/README.md`](../images/telvm-closed-claude/README.md) and [`images/telvm-closed-codex/README.md`](../images/telvm-closed-codex/README.md). Labels and egress defaults: [closed-agent-docker-labels.md](closed-agent-docker-labels.md), [closed-agent-network-harness-contract.md](closed-agent-network-harness-contract.md).
 
 ### Non-interactive Phoenix scaffolding
 
