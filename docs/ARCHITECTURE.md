@@ -8,6 +8,7 @@ telvm is a **Phoenix** application (**companion**) on **your computer** that tal
 - **Why Elixir / OTP and the Docker socket** — [OTP, Finch, and the Docker Unix socket](#otp-finch-and-the-docker-unix-socket) and [Why Elixir / OTP](#why-elixir--otp).
 - **Integrating an agent or script** — start with [agent-api.md](agent-api.md), then [plumbing.md](plumbing.md) for why the UI and **`/telvm/api/stream`** share some lifecycle events (and which updates are UI-only), then [`machine_controller.ex`](../companion/lib/companion_web/machine_controller.ex) for implementation details.
 - **Running the stack locally** — [quickstart.md](quickstart.md) and the Compose diagram under [Host, Compose, and a single published port](#host-compose-and-a-single-published-port) below.
+- **Closed-inference agents (Claude / Codex) + Windows network agent** — [closed-agent-network-harness-contract.md](closed-agent-network-harness-contract.md) and linked docs (wireframe, Docker labels, integration test matrix, submodule policy). Published GHCR images: [`images/telvm-closed-claude`](../images/telvm-closed-claude/README.md), [`images/telvm-closed-codex`](../images/telvm-closed-codex/README.md).
 
 ## One-glance mental model (ASCII)
 

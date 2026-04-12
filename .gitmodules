@@ -1,0 +1,6 @@
+[submodule "third_party/claude-code"]
+	path = third_party/claude-code
+	url = https://github.com/anthropics/claude-code.git
+[submodule "third_party/codex"]
+	path = third_party/codex
+	url = https://github.com/openai/codex.git

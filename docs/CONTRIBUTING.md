@@ -13,6 +13,16 @@ Thanks for helping improve telvm. This document covers how to work on the repo a
 - **Docker (recommended):** [quickstart.md](quickstart.md) — `docker compose up --build`, tests via `docker compose --profile test run --rm companion_test`.
 - **Local Elixir:** from `companion/`, `mix setup` then `mix phx.server` with Postgres as in `config/dev.exs`.
 
+### Git submodules (closed-agent upstream trees)
+
+The repo pins **`third_party/claude-code`** and **`third_party/codex`** ([policy](closed-agent-upstream-submodule-policy.md)). After clone, run:
+
+```bash
+git submodule update --init --recursive
+```
+
+CI workflows that build those images use **`actions/checkout` with `submodules: recursive`**. If submodule directories are empty, local **`docker build -f images/telvm-closed-*/Dockerfile .`** still works (Dockerfiles install from npm), but you will miss upstream reference files until submodules are initialized.
+
 ## Before you open a PR
 
 1. Run the **full test suite** the same way CI does (Docker Compose command above), or `mix test` from `companion/` with `TEST_DATABASE_URL` / Postgres configured.

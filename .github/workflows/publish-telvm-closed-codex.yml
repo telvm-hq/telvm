@@ -1,0 +1,42 @@
+name: Publish telvm-closed-codex
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "images/telvm-closed-codex/**"
+      - "third_party/codex"
+      - ".github/workflows/publish-telvm-closed-codex.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set image name (lowercase owner for GHCR)
+        run: |
+          owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE=ghcr.io/${owner}/telvm-closed-codex" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: images/telvm-closed-codex/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:main
+            ${{ env.IMAGE }}:${{ github.sha }}

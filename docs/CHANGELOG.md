@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Closed-inference agents + PowerShell network harness (docs)
+
+- **Docs:** [closed-agent-network-harness-contract.md](closed-agent-network-harness-contract.md) (three-plane contract, egress tiers, secrets, bridge vs LAN attach), [closed-agent-provision-tab-wireframe.md](closed-agent-provision-tab-wireframe.md) (new tab + Warm assets + Pre-flight links), [closed-agent-docker-labels.md](closed-agent-docker-labels.md) (container labels and naming), [closed-agent-integration-test-matrix.md](closed-agent-integration-test-matrix.md) (manual checklist), [closed-agent-upstream-submodule-policy.md](closed-agent-upstream-submodule-policy.md) (submodule decision and pin process). Cross-links from [internal-claude-code-codex-devcontainers.md](internal-claude-code-codex-devcontainers.md) and [telvm-network-agent README](../agents/telvm-network-agent/README.md).
+
+### Closed-agent GHCR images + upstream submodules
+
+- **Submodules:** `third_party/claude-code` (anthropics/claude-code), `third_party/codex` (openai/codex), with pins recorded in [closed-agent-upstream-submodule-policy.md](closed-agent-upstream-submodule-policy.md).
+- **Images:** [images/telvm-closed-claude](../images/telvm-closed-claude/README.md), [images/telvm-closed-codex](../images/telvm-closed-codex/README.md) — Node 22 bookworm, npm CLIs, `telvm.*` labels, default `CMD sleep infinity` (no API keys in image).
+- **CI:** [publish-telvm-closed-claude.yml](../.github/workflows/publish-telvm-closed-claude.yml), [publish-telvm-closed-codex.yml](../.github/workflows/publish-telvm-closed-codex.yml) → `ghcr.io/<owner>/telvm-closed-{claude,codex}`.
+- **Docs:** [CONTRIBUTING](CONTRIBUTING.md) submodule clone note; [quickstart](quickstart.md) pull/build pointers; harness contract section on default egress vs `init-firewall`.
+
 ### Agent setup (optional CPU inference)
 
 - **Compose:** optional **Ollama**, one-shot **ollama_pull**, and **Goose** CLI image; companion env **`TELVM_INFERENCE_BASE_URL`**, **`TELVM_AGENT_DEFAULT_MODEL`** (see [quickstart](quickstart.md)).
@@ -14,13 +25,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 No breaking changes to the **Machine API** (`/telvm/api`) or to **ProxyPlug** / lab **Verify** flows.
 
-### retardeel -- Zig filesystem agent (v0.1.0)
+### retardeel -- Zig filesystem agent (v0.1.0) → telvm-agent nervous system
 
 - **New agent:** `agents/retardeel/` -- static Zig binary for jailed filesystem operations (health, workspace discovery, stat, read, write, list) with Bearer auth and path jailing.
 - **Dockerfile:** multi-stage Alpine + Zig 0.13 build; no host toolchain required.
-- **RetardeelVerifier:** companion GenServer that builds the image, injects the binary into a sandbox container, and runs 11 endpoint checks (TDD-style, manual trigger from Agent setup).
+- **RetardeelVerifier:** companion GenServer that builds the image, injects the binary into a sandbox container, and runs 14 endpoint checks (TDD-style, manual trigger from Agent setup).
 - **Agent setup UI:** "Verify retardeel" button with PASS/FAIL/SKIP results panel.
 - **Infra:** Docker CLI added to companion image; `./agents` mounted read-only into the companion container.
+
+### portscout + proctop -- guest-side telemetry (v0.2.0)
+
+- **`GET /v1/ports` (portscout):** parses `/proc/net/tcp` and `/proc/net/tcp6` to discover all listening ports inside a container with protocol info. No configuration required -- services light up automatically.
+- **`GET /v1/proc` (proctop):** reads `/proc/loadavg`, `/proc/meminfo`, and `/proc/[pid]/stat` to return load averages, memory usage, and top processes sorted by CPU time with RSS.
+- **`TelvmAgentPoller` GenServer:** periodic poller that discovers sandbox containers, probes `/health`, `/v1/ports`, and `/v1/proc`, and broadcasts snapshots via PubSub.
+- **Warm Assets dashboard:** per-container "telvm-agent" panel showing discovered services (port badges), memory usage bar, load averages, and top-5 process table.
+- **Verifier expansion:** 11 → 14 checks: ports endpoint, proc telemetry, and port discovery (spawns a Node.js listener and verifies portscout finds it).
 
 ## [1.1.0] — 2026-03-31
 
