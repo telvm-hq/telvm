@@ -15,7 +15,7 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ "Postgres (Ecto Repo)"
     assert html =~ ~s(href="/warm")
     assert html =~ ~s(href="/machines")
-    assert html =~ ~s(href="/agent")
+    assert html =~ ~s(href="/oss-agents")
     assert html =~ "/health"
     assert html =~ "api reference"
   end
@@ -25,10 +25,15 @@ defmodule CompanionWeb.StatusLiveTest do
     assert redirected_to(conn) == "/warm"
   end
 
-  test "GET /agent renders agent setup preflight panel", %{conn: conn} do
+  test "GET /agent redirects to /oss-agents", %{conn: conn} do
     conn = get(conn, ~p"/agent")
+    assert redirected_to(conn) == "/oss-agents"
+  end
+
+  test "GET /oss-agents renders OSS agents panel", %{conn: conn} do
+    conn = get(conn, ~p"/oss-agents")
     html = html_response(conn, 200)
-    assert html =~ "telvm · agent setup"
+    assert html =~ "telvm · oss agents"
     assert html =~ "agent-inference-preflight"
     assert html =~ ~s(id="agent-goose-panel")
     assert html =~ ~s(id="agent-chat-panel")
@@ -38,9 +43,14 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ ~s(phx-submit="send_goose_chat")
     assert html =~ ~s(id="agent-goose-chat")
     assert html =~ ~s(id="agent-goose-health-line")
-    assert html =~ ~s(href="/agent")
+    assert html =~ ~s(href="/oss-agents")
     assert html =~ ~s(href="/warm")
     assert html =~ ~s(href="/machines")
+  end
+
+  test "GET /other-agents redirects to /machines", %{conn: conn} do
+    conn = get(conn, ~p"/other-agents")
+    assert redirected_to(conn) == "/machines"
   end
 
   test "GET /warm renders warm assets layout and network blueprint", %{conn: conn} do
@@ -49,7 +59,7 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ "Warm assets"
     assert html =~ "warm-machines-section"
     assert html =~ "warm assets"
-    assert html =~ "No warm machines"
+    assert html =~ "No warm rows"
     # "endpoints" appears only when at least one warm machine row exists
     assert html =~ "telvm · warm assets"
     assert html =~ "Network blueprint"
@@ -73,6 +83,8 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ "Verify (pre-flight + 15s soak)"
     assert html =~ "destroy all lab"
     assert html =~ "byoi-image-ref"
+    assert html =~ ~s(id="byoi-pull-btn")
+    assert html =~ ~s(phx-click="pull_byoi_image")
     assert html =~ "image &amp; runtime"
     assert html =~ "Phoenix (certified)"
     assert html =~ "Go (certified)"
@@ -83,6 +95,14 @@ defmodule CompanionWeb.StatusLiveTest do
     refute html =~ "Node + Bun"
     assert html =~ "Certified soak (60s)"
     assert html =~ "mission console"
+    assert html =~ ~s(id="closed-agents-machines-section")
+    assert html =~ "vendor CLI agents"
+    assert html =~ "Node + Claude Code"
+    assert html =~ "Node + Codex"
+    assert html =~ ~s(phx-click="set_closed_agents_tab")
+    assert html =~ ~s(phx-click="pull_closed_agent_image")
+    assert html =~ ~s(phx-click="verify_closed_agent")
+    assert html =~ "Basic soak"
     refute html =~ "warm-machines-section"
     refute html =~ "id=\"lab-preview-frame\""
     refute html =~ "machines-log"
@@ -117,6 +137,33 @@ defmodule CompanionWeb.StatusLiveTest do
 
     assert source =~ ~s(phx-click="certified_extended_soak")
     assert source =~ "handle_event(\"certified_extended_soak\""
+  end
+
+  test "machines LiveView defines BYOI pull handler" do
+    path = Path.expand("../../../lib/companion_web/live/status_live.ex", __DIR__)
+    source = File.read!(path)
+
+    assert source =~ ~s(phx-click="pull_byoi_image")
+    assert source =~ "handle_event(\"pull_byoi_image\""
+  end
+
+  test "machines LiveView defines closed agent pull and tab handlers" do
+    path = Path.expand("../../../lib/companion_web/live/status_live.ex", __DIR__)
+    source = File.read!(path)
+
+    assert source =~ ~s(phx-click="pull_closed_agent_image")
+    assert source =~ "handle_event(\"pull_closed_agent_image\""
+    assert source =~ ~s(phx-click="set_closed_agents_tab")
+    assert source =~ "handle_event(\"set_closed_agents_tab\""
+  end
+
+  test "machines LiveView defines select pulled chip handler" do
+    path = Path.expand("../../../lib/companion_web/live/status_live.ex", __DIR__)
+    source = File.read!(path)
+
+    assert source =~ ~s(id="saved-pull-chips")
+    assert source =~ ~s(phx-click="select_pulled_chip")
+    assert source =~ "handle_event(\"select_pulled_chip\""
   end
 
   test "warm assets LiveView defines restart / pause / resume handlers" do

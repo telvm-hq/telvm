@@ -2,7 +2,7 @@ defmodule Companion.InferenceChat do
   @moduledoc """
   Non-streaming OpenAI-compatible chat completions (`POST /v1/chat/completions`).
 
-  Used for the Agent setup smoke chat; inference still runs in Ollama (or another server), not in BEAM.
+  Used for the OSS Agents smoke chat; inference still runs in Ollama (or another server), not in BEAM.
   """
 
   alias Companion.InferencePreflight
