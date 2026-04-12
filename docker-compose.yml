@@ -112,7 +112,19 @@ services:
       - ./agents:/agents:ro
     ports:
       - "4000:4000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://127.0.0.1:4000/telvm/api/fyi >/dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 180s
     environment:
+      # Compose project label used when discovering closed-agent containers (later PRs add those services).
+      TELVM_COMPOSE_PROJECT: ${TELVM_COMPOSE_PROJECT:-telvm}
       DATABASE_URL: postgres://postgres:postgres@db:5432/companion_dev
       PHX_HTTP_IP: 0.0.0.0
       PHX_SERVER: "true"
@@ -127,6 +139,9 @@ services:
       # Optional: after publishing images/go-http-lab to GHCR, set in .env (see .env.example):
       # TELVM_LAB_IMAGE=ghcr.io/<your-org>/telvm-go-http-lab:main
       # TELVM_LAB_USE_IMAGE_CMD=1
+      # Per-workload HTTP CONNECT egress (see companion/lib/companion/egress_proxy). Disabled in :test.
+      TELVM_EGRESS_ENABLED: "1"
+      TELVM_EGRESS_WORKLOADS: '[{"id":"closed_claude","port":4001,"allow_hosts":["api.anthropic.com",".anthropic.com","deb.debian.org","security.debian.org",".debian.org"]},{"id":"closed_codex","port":4002,"allow_hosts":["api.openai.com",".openai.com","deb.debian.org","security.debian.org",".debian.org"]}]'
     depends_on:
       db:
         condition: service_healthy
