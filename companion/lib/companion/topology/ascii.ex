@@ -174,7 +174,7 @@ defmodule Companion.Topology.Ascii do
   defp lab_section(machines) do
     case machines do
       [] ->
-        "(no lab containers yet — Verify on Machines)"
+        "(no warm rows yet — lab verify on Machines or Basic soak for vendor CLI agents)"
 
       _ ->
         machines
@@ -212,25 +212,44 @@ defmodule Companion.Topology.Ascii do
     st = m |> Map.get(:status, "?") |> to_string() |> String.slice(0, 4) |> String.pad_trailing(4)
     img = m |> Map.get(:image, "") |> to_string() |> String.slice(0, 12)
 
-    pub =
-      case Map.get(m, :ports, []) do
-        ps when is_list(ps) and ps != [] ->
-          ps |> Enum.map(fn p -> ":#{p}" end) |> Enum.join(" ")
+    {pub, int_line} =
+      if Map.get(m, :kind) == :closed_agent do
+        listener =
+          case Map.get(m, :egress_internal_url) do
+            "http://companion:" <> rest ->
+              port_part = rest |> String.split("/") |> hd()
+              "→:#{port_part}"
 
-        _ ->
-          "—"
+            _ ->
+              "→?"
+          end
+
+        wl = Map.get(m, :egress_workload_id)
+        tag = if is_binary(wl), do: String.slice(wl, 0, 10), else: "?"
+
+        {String.slice(listener, 0, 12), String.slice("wl:" <> tag, 0, 12)}
+      else
+        pub =
+          case Map.get(m, :ports, []) do
+            ps when is_list(ps) and ps != [] ->
+              ps |> Enum.map(fn p -> ":#{p}" end) |> Enum.join(" ")
+
+            _ ->
+              "—"
+          end
+
+        int =
+          case Map.get(m, :internal_ports, []) do
+            ps when is_list(ps) and ps != [] ->
+              ps |> Enum.take(2) |> Enum.map(fn p -> "i#{p}" end) |> Enum.join(" ")
+
+            _ ->
+              ""
+          end
+
+        int_line = if int == "", do: " ", else: int
+        {pub, int_line}
       end
-
-    int =
-      case Map.get(m, :internal_ports, []) do
-        ps when is_list(ps) and ps != [] ->
-          ps |> Enum.take(2) |> Enum.map(fn p -> "i#{p}" end) |> Enum.join(" ")
-
-        _ ->
-          ""
-      end
-
-    int_line = if int == "", do: " ", else: int
 
     inner = [
       " #{String.pad_trailing(name, @max_name)} ",

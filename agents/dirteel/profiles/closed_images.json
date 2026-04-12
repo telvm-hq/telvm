@@ -1,0 +1,16 @@
+[
+  {
+    "compose_service": "telvm_closed_claude",
+    "proxy_port": 4001,
+    "vendor_url": "https://api.anthropic.com/",
+    "product": "claude-code",
+    "ghcr_package": "telvm-closed-claude"
+  },
+  {
+    "compose_service": "telvm_closed_codex",
+    "proxy_port": 4002,
+    "vendor_url": "https://api.openai.com/",
+    "product": "codex",
+    "ghcr_package": "telvm-closed-codex"
+  }
+]

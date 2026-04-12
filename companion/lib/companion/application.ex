@@ -13,7 +13,8 @@ defmodule Companion.Application do
       {Finch, name: Companion.Finch, pools: finch_pools()},
       {DynamicSupervisor,
        strategy: :one_for_one, name: Companion.VmLifecycle.RunnerDynamicSupervisor},
-      Companion.PreflightServer
+      Companion.PreflightServer,
+      Companion.ClosedAgentWarmRegistry
     ]
 
     children =

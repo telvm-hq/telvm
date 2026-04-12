@@ -13,6 +13,10 @@ defmodule CompanionWeb.StatusLive do
   alias Companion.GooseRuntime
   alias Companion.GooseHealth
   alias Companion.NetworkAgentPoller
+  alias Companion.EgressProxy
+  alias Companion.ClosedAgents.Catalog, as: ClosedAgentsCatalog
+  alias Companion.ClosedAgentWarmRegistry
+  alias Companion.SavedLabImages
 
   @default_entry LabCatalog.get(:cert_phoenix)
   @agent_chat_max_messages 40
@@ -77,9 +81,16 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:goose_logs_error, nil)
       |> assign(:goose_health_snapshot, nil)
       |> assign(:network_agent_snapshot, nil)
+      |> assign(:egress_proxy_snapshot, EgressProxy.snapshot())
       |> assign(:fyi_expanded, false)
       |> assign(:retardeel_verify_status, :idle)
       |> assign(:retardeel_verify_results, nil)
+      |> assign(:other_agents_rows, [])
+      |> assign(:other_agents_verify_busy, false)
+      |> assign(:other_agents_verify_service, nil)
+      |> assign(:other_agents_verify_error, nil)
+      |> assign(:saved_pull_refs, SavedLabImages.list_refs_for_chips())
+      |> assign(:closed_agents_tab, "claude")
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Companion.PubSub, Preflight.topic())
@@ -89,9 +100,10 @@ defmodule CompanionWeb.StatusLive do
       Phoenix.PubSub.subscribe(Companion.PubSub, GooseHealth.topic())
 
       Phoenix.PubSub.subscribe(Companion.PubSub, NetworkAgentPoller.topic())
+      Phoenix.PubSub.subscribe(Companion.PubSub, EgressProxy.topic())
       Phoenix.PubSub.subscribe(Companion.PubSub, Companion.RetardeelVerifier.topic())
 
-      if socket.assigns.live_action == :agent_setup do
+      if socket.assigns.live_action == :oss_agents do
         send(self(), :load_goose_panel)
       end
     end
@@ -112,19 +124,21 @@ defmodule CompanionWeb.StatusLive do
 
       action when action in [:machines, :warm_assets] ->
         socket = assign(socket, :page_title, page_title(socket))
-        socket = assign(socket, :warm_machines, fetch_warm_machines())
+        socket = assign(socket, :warm_machines, fetch_warm_machines_merged())
 
         socket =
           if action == :warm_assets do
             assign(socket, :compose_stack_snapshot, fetch_compose_stack_snapshot())
           else
             socket
+            |> assign(:saved_pull_refs, SavedLabImages.list_refs_for_chips())
+            |> assign(:other_agents_rows, fetch_other_agents_rows())
           end
 
         if connected?(socket), do: schedule_warm_refresh()
         {:noreply, socket}
 
-      :agent_setup ->
+      :oss_agents ->
         socket = assign(socket, :page_title, page_title(socket))
 
         if connected?(socket) do
@@ -144,7 +158,7 @@ defmodule CompanionWeb.StatusLive do
     case socket.assigns[:live_action] do
       :machines -> "Machines"
       :warm_assets -> "Warm assets"
-      :agent_setup -> "Agent setup"
+      :oss_agents -> "OSS Agents"
       _ -> "Pre-flight"
     end
   end
@@ -187,6 +201,37 @@ defmodule CompanionWeb.StatusLive do
 
   def handle_info({:network_agent_snapshot, snapshot}, socket) when is_map(snapshot) do
     {:noreply, assign(socket, :network_agent_snapshot, snapshot)}
+  end
+
+  def handle_info({:egress_deny, _payload}, socket) do
+    {:noreply, assign(socket, :egress_proxy_snapshot, EgressProxy.snapshot())}
+  end
+
+  def handle_info({:closed_agent_verify_done, service, cid, {:ok, :verified}}, socket) do
+    ClosedAgentWarmRegistry.register_verified(cid)
+
+    socket =
+      socket
+      |> assign(:other_agents_verify_busy, false)
+      |> assign(:other_agents_verify_service, nil)
+      |> assign(:other_agents_verify_error, nil)
+      |> assign(:other_agents_rows, fetch_other_agents_rows())
+      |> put_flash(:info, "#{service}: basic egress soak passed — see Warm assets")
+      |> refresh_warm_machine_assigns()
+      |> maybe_followup_warm_refresh()
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:closed_agent_verify_done, service, _cid, {:error, step, msg}}, socket) do
+    err = "#{service} basic soak failed (#{step}): #{msg}"
+
+    {:noreply,
+     socket
+     |> assign(:other_agents_verify_busy, false)
+     |> assign(:other_agents_verify_service, nil)
+     |> assign(:other_agents_verify_error, err)
+     |> assign(:other_agents_rows, fetch_other_agents_rows())}
   end
 
   def handle_info({:vm_manager_preflight, {:line, kind, ts, text}}, socket) do
@@ -257,7 +302,7 @@ defmodule CompanionWeb.StatusLive do
     {:noreply, assign(socket, :image_build_busy, false)}
   end
 
-  def handle_info({:image_pull_done, _ref, result}, socket) do
+  def handle_info({:image_pull_done, ref, result}, socket) do
     socket =
       socket
       |> assign(:image_pull_busy, false)
@@ -265,8 +310,26 @@ defmodule CompanionWeb.StatusLive do
 
     socket =
       case result do
-        :ok -> put_flash(socket, :info, "Image pulled successfully.")
-        {:error, reason} -> put_flash(socket, :error, "Pull failed: #{inspect(reason)}")
+        :ok ->
+          socket = put_flash(socket, :info, "Image pulled successfully.")
+
+          case SavedLabImages.record_pull(ref) do
+            {:ok, _} ->
+              assign(socket, :saved_pull_refs, SavedLabImages.list_refs_for_chips())
+
+            {:error, changeset} ->
+              msg =
+                changeset.errors
+                |> Enum.map(fn {f, {m, _}} -> "#{f} #{m}" end)
+                |> Enum.join("; ")
+
+              socket
+              |> assign(:saved_pull_refs, SavedLabImages.list_refs_for_chips())
+              |> put_flash(:error, "Could not save image ref for reuse: #{msg}")
+          end
+
+        {:error, reason} ->
+          put_flash(socket, :error, "Pull failed: #{inspect(reason)}")
       end
 
     {:noreply, socket}
@@ -354,7 +417,7 @@ defmodule CompanionWeb.StatusLive do
   end
 
   def handle_info(:load_goose_panel, socket) do
-    if socket.assigns.live_action == :agent_setup do
+    if socket.assigns.live_action == :oss_agents do
       {:noreply, load_goose_panel(socket)}
     else
       {:noreply, socket}
@@ -362,7 +425,7 @@ defmodule CompanionWeb.StatusLive do
   end
 
   def handle_info(:auto_connect_inference, socket) do
-    if socket.assigns.live_action != :agent_setup do
+    if socket.assigns.live_action != :oss_agents do
       {:noreply, socket}
     else
       base = socket.assigns.inference_base_url |> to_string() |> String.trim()
@@ -419,7 +482,7 @@ defmodule CompanionWeb.StatusLive do
   end
 
   def handle_info({:goose_health, snap}, socket) do
-    if socket.assigns.live_action == :agent_setup do
+    if socket.assigns.live_action == :oss_agents do
       {:noreply, assign(socket, :goose_health_snapshot, snap)}
     else
       {:noreply, socket}
@@ -427,7 +490,7 @@ defmodule CompanionWeb.StatusLive do
   end
 
   def handle_info({:retardeel_verify, payload}, socket) do
-    if socket.assigns.live_action == :agent_setup do
+    if socket.assigns.live_action == :oss_agents do
       {:noreply,
        socket
        |> assign(:retardeel_verify_status, payload.status)
@@ -438,7 +501,7 @@ defmodule CompanionWeb.StatusLive do
   end
 
   def handle_info({:goose_chat_done, result}, socket) do
-    if socket.assigns.live_action != :agent_setup do
+    if socket.assigns.live_action != :oss_agents do
       {:noreply, socket}
     else
       case result do
@@ -465,7 +528,7 @@ defmodule CompanionWeb.StatusLive do
 
   def handle_info({:agent_chat_done, result}, socket) do
     cond do
-      socket.assigns.live_action != :agent_setup ->
+      socket.assigns.live_action != :oss_agents ->
         {:noreply, socket}
 
       socket.assigns.agent_chat_session != :active ->
@@ -538,15 +601,13 @@ defmodule CompanionWeb.StatusLive do
        |> assign(:selected_catalog_entry, catalog_match)
        |> assign(:selected_telvm_certified, Map.get(catalog_match, :telvm_certified, false))}
     else
-      {:noreply,
-       socket
-       |> assign(:selected_image, ref)
-       |> assign(:selected_use_image_cmd, true)
-       |> assign(:selected_container_cmd, nil)
-       |> assign(:selected_catalog_id, nil)
-       |> assign(:selected_catalog_entry, nil)
-       |> assign(:selected_telvm_certified, false)}
+      {:noreply, select_custom_image_ref(socket, ref)}
     end
+  end
+
+  @impl true
+  def handle_event("select_pulled_chip", %{"ref" => ref}, socket) do
+    {:noreply, select_custom_image_ref(socket, ref)}
   end
 
   # --- Events: build image ---
@@ -709,7 +770,7 @@ defmodule CompanionWeb.StatusLive do
     content = params |> Map.get("content", "") |> to_string() |> String.trim()
 
     cond do
-      socket.assigns.live_action != :agent_setup ->
+      socket.assigns.live_action != :oss_agents ->
         {:noreply, socket}
 
       socket.assigns.goose_chat_busy ->
@@ -752,7 +813,7 @@ defmodule CompanionWeb.StatusLive do
 
   @impl true
   def handle_event("clear_goose_chat", _params, socket) do
-    if socket.assigns.live_action == :agent_setup do
+    if socket.assigns.live_action == :oss_agents do
       {:noreply,
        socket
        |> assign(:goose_chat_messages, [])
@@ -788,6 +849,64 @@ defmodule CompanionWeb.StatusLive do
         end)
 
         {:noreply, assign(socket, :image_pull_busy, true)}
+    end
+  end
+
+  @impl true
+  def handle_event("pull_byoi_image", _params, socket) do
+    ref = socket.assigns.selected_image |> to_string() |> String.trim()
+
+    cond do
+      ref == "" ->
+        {:noreply, put_flash(socket, :error, "Paste an image reference before pulling.")}
+
+      socket.assigns.image_pull_busy ->
+        {:noreply, put_flash(socket, :error, "A pull is already in progress.")}
+
+      true ->
+        pid = self()
+
+        Task.start(fn ->
+          result = Companion.Docker.impl().image_pull(ref)
+          send(pid, {:image_pull_done, ref, result})
+        end)
+
+        {:noreply, assign(socket, :image_pull_busy, true)}
+    end
+  end
+
+  @impl true
+  def handle_event("pull_closed_agent_image", %{"service" => service}, socket) do
+    entry = ClosedAgentsCatalog.by_compose_service(to_string(service))
+
+    cond do
+      is_nil(entry) ->
+        {:noreply, put_flash(socket, :error, "Unknown closed-agent service.")}
+
+      socket.assigns.image_pull_busy ->
+        {:noreply, put_flash(socket, :error, "A pull is already in progress.")}
+
+      true ->
+        ref = ClosedAgentsCatalog.ghcr_main_ref(entry)
+        pid = self()
+
+        Task.start(fn ->
+          result = Companion.Docker.impl().image_pull(ref)
+          send(pid, {:image_pull_done, ref, result})
+        end)
+
+        {:noreply, assign(socket, :image_pull_busy, true)}
+    end
+  end
+
+  @impl true
+  def handle_event("set_closed_agents_tab", %{"tab" => tab}, socket) do
+    tab = to_string(tab)
+
+    if tab in Enum.map(ClosedAgentsCatalog.entries(), & &1.tab_key) do
+      {:noreply, assign(socket, :closed_agents_tab, tab)}
+    else
+      {:noreply, socket}
     end
   end
 
@@ -945,7 +1064,7 @@ defmodule CompanionWeb.StatusLive do
     tail = 200
 
     cond do
-      socket.assigns.live_action != :agent_setup ->
+      socket.assigns.live_action != :oss_agents ->
         {:noreply, socket}
 
       is_nil(id) ->
@@ -978,7 +1097,7 @@ defmodule CompanionWeb.StatusLive do
     id = socket.assigns[:goose_container_id]
 
     cond do
-      socket.assigns.live_action != :agent_setup ->
+      socket.assigns.live_action != :oss_agents ->
         {:noreply, socket}
 
       is_nil(id) ->
@@ -1005,7 +1124,7 @@ defmodule CompanionWeb.StatusLive do
   @impl true
   def handle_event("verify_retardeel", _params, socket) do
     cond do
-      socket.assigns.live_action != :agent_setup ->
+      socket.assigns.live_action != :oss_agents ->
         {:noreply, socket}
 
       socket.assigns.retardeel_verify_status == :running ->
@@ -1092,6 +1211,40 @@ defmodule CompanionWeb.StatusLive do
       |> maybe_followup_warm_refresh()
 
     {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("verify_closed_agent", %{"service" => service, "container-id" => cid}, socket) do
+    cid = String.trim(to_string(cid || ""))
+
+    cond do
+      cid == "" ->
+        {:noreply, put_flash(socket, :error, "Start the closed-agent Compose service first.")}
+
+      is_nil(ClosedAgentsCatalog.by_compose_service(service)) ->
+        {:noreply, put_flash(socket, :error, "Unknown closed-agent service.")}
+
+      true ->
+        entry = ClosedAgentsCatalog.by_compose_service(service)
+        parent = self()
+
+        Task.start(fn ->
+          result =
+            Companion.ClosedAgents.Verify.run(
+              cid,
+              entry.proxy_port,
+              entry.vendor_url
+            )
+
+          send(parent, {:closed_agent_verify_done, service, cid, result})
+        end)
+
+        {:noreply,
+         socket
+         |> assign(:other_agents_verify_busy, true)
+         |> assign(:other_agents_verify_service, service)
+         |> assign(:other_agents_verify_error, nil)}
+    end
   end
 
   # --- Events: restart / pause / resume (Engine API via Docker adapter) ---
@@ -1201,6 +1354,28 @@ defmodule CompanionWeb.StatusLive do
     end
   end
 
+  defp select_custom_image_ref(socket, ref) do
+    ref = ref |> to_string() |> String.trim()
+
+    socket
+    |> assign(:selected_image, ref)
+    |> assign(:selected_use_image_cmd, true)
+    |> assign(:selected_container_cmd, nil)
+    |> assign(:selected_catalog_id, nil)
+    |> assign(:selected_catalog_entry, nil)
+    |> assign(:selected_telvm_certified, false)
+  end
+
+  defp trimmed_chip_label(ref) when is_binary(ref) do
+    ref = String.trim(ref)
+
+    if String.length(ref) <= 44 do
+      ref
+    else
+      String.slice(ref, 0, 41) <> "…"
+    end
+  end
+
   defp lab_overrides_from_assigns(%{selected_image: ref} = assigns) do
     entry =
       case assigns[:selected_catalog_id] do
@@ -1264,8 +1439,8 @@ defmodule CompanionWeb.StatusLive do
       :warm_assets ->
         warm_assets(assigns)
 
-      :agent_setup ->
-        agent_setup(assigns)
+      :oss_agents ->
+        oss_agents(assigns)
 
       action
       when action in [
@@ -1282,15 +1457,15 @@ defmodule CompanionWeb.StatusLive do
     end
   end
 
-  # --- Agent setup tab ---
+  # --- OSS Agents tab (Ollama / Goose / Model / retardeel) ---
 
-  defp agent_setup(assigns) do
+  defp oss_agents(assigns) do
     ~H"""
     <div class="telvm-terminal telvm-console-shell px-3 py-3 sm:px-4 sm:py-4">
       <.terminal_nav active={@live_action} />
       <div class="flex flex-wrap items-end justify-between gap-2 telvm-accent-border-b border-b pb-2 mb-4">
         <div class="text-[11px] sm:text-xs uppercase tracking-[0.2em] telvm-accent-text font-semibold">
-          telvm · agent setup
+          telvm · oss agents
         </div>
       </div>
 
@@ -1822,7 +1997,7 @@ defmodule CompanionWeb.StatusLive do
   defp goose_chat_row_class(_), do: "px-2 py-2"
 
   defp goose_health_line(nil) do
-    "Goose health: land here with the stack running; probes run periodically and when you open Agent setup."
+    "Goose health: land here with the stack running; probes run periodically and when you open OSS Agents."
   end
 
   defp goose_health_line(%Companion.GooseHealth.Snapshot{} = s) do
@@ -1870,6 +2045,152 @@ defmodule CompanionWeb.StatusLive do
     if length(msgs) <= max, do: msgs, else: Enum.take(msgs, -max)
   end
 
+  # --- Machines: vendor CLI agents (Claude / Codex) — pull, basic soak, warm ---
+
+  defp closed_agents_machines_section(assigns) do
+    ~H"""
+    <section
+      class="mb-5 rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4"
+      id="closed-agents-machines-section"
+    >
+      <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] mb-2 font-semibold">
+        vendor CLI agents
+      </div>
+      <p class="text-[10px] mb-3 leading-snug max-w-2xl" style="color: var(--telvm-shell-muted);">
+        Pull the published image, start the matching Compose service, then run
+        <span class="telvm-accent-dim-text">Basic soak</span> (egress proxy + apt). On success the container is listed on
+        <span class="telvm-accent-dim-text">Warm assets</span>. Promotion is in-memory until companion restarts.
+        Discovery uses Compose project <span class="font-mono">{compose_project_name()}</span>
+        (<code class="text-[9px]">TELVM_COMPOSE_PROJECT</code> to override).
+      </p>
+
+      <div
+        class="flex rounded overflow-hidden text-[10px] mb-3 w-fit"
+        style="border: 1px solid var(--telvm-shell-border);"
+      >
+        <button
+          type="button"
+          phx-click="set_closed_agents_tab"
+          phx-value-tab="claude"
+          class={[
+            "px-2 py-1",
+            @closed_agents_tab == "claude" && "telvm-nav-tab-active",
+            @closed_agents_tab != "claude" && "telvm-nav-tab-idle"
+          ]}
+        >
+          Node + Claude Code
+        </button>
+        <button
+          type="button"
+          phx-click="set_closed_agents_tab"
+          phx-value-tab="codex"
+          class={[
+            "px-2 py-1 border-l",
+            @closed_agents_tab == "codex" && "telvm-nav-tab-active",
+            @closed_agents_tab != "codex" && "telvm-nav-tab-idle"
+          ]}
+          style="border-left-color: var(--telvm-shell-border);"
+        >
+          Node + Codex
+        </button>
+      </div>
+
+      <div
+        :if={@other_agents_verify_error}
+        class="mb-3 text-[11px] font-mono telvm-text-danger-ink whitespace-pre-wrap"
+        id="closed-agents-verify-error"
+      >
+        {@other_agents_verify_error}
+      </div>
+
+      <div :for={row <- @other_agents_rows} :if={row.entry.tab_key == @closed_agents_tab}>
+        <div class="rounded border p-3 max-w-3xl" style="border-color: var(--telvm-shell-border);">
+          <div class="text-sm font-semibold mb-1" style="color: var(--telvm-shell-fg);">
+            {row.entry.card_title}
+          </div>
+          <p class="text-[10px] font-mono mb-2 telvm-accent-dim-text">
+            {row.entry.stack_line}
+          </p>
+          <div
+            class="rounded border p-2 mb-3 font-mono text-[10px] leading-relaxed whitespace-pre-wrap overflow-x-auto"
+            style="border-color: color-mix(in oklch, var(--telvm-shell-border) 85%, transparent); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+          >
+            {row.entry.stack_disclosure}
+          </div>
+          <div class="text-[10px] font-mono mb-2 break-all" style="color: var(--telvm-shell-muted);">
+            <span class="telvm-accent-dim-text">image</span> {ClosedAgentsCatalog.ghcr_main_ref(row.entry)}
+          </div>
+          <div class="flex flex-wrap gap-2 mb-3">
+            <button
+              type="button"
+              phx-click="pull_closed_agent_image"
+              phx-value-service={row.entry.compose_service}
+              disabled={@image_pull_busy or @vm_preflight_busy}
+              class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-pull-btn disabled:opacity-40"
+            >
+              {if @image_pull_busy, do: "…", else: "pull image"}
+            </button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 mb-2 text-[10px] font-mono">
+            <span class={if(row.running, do: "telvm-text-ok", else: "telvm-text-warn")}>
+              {if row.running, do: "running", else: "not running"}
+            </span>
+            <span :if={row.in_warm_registry} class="telvm-text-ok">on warm assets</span>
+            <span class="telvm-accent-dim-text">
+              compose · {row.entry.compose_service} · proxy companion:{row.entry.proxy_port}
+            </span>
+          </div>
+          <div
+            :if={row.egress_workload}
+            class="text-[10px] font-mono mb-2 break-all leading-snug"
+            style="color: var(--telvm-shell-muted);"
+          >
+            <span class="telvm-accent-dim-text">egress workload</span> {row.egress_workload.id}
+            <span> · </span>
+            <span class="telvm-accent-dim-text">allowlist</span> {row.egress_workload.allow_digest}
+          </div>
+          <div
+            :if={!row.egress_workload && @egress_proxy_snapshot.enabled}
+            class="text-[10px] font-mono mb-2 telvm-text-warn"
+            style="color: var(--telvm-shell-muted);"
+          >
+            no egress workload in companion config for companion:{row.entry.proxy_port} — check
+            <code class="telvm-accent-dim-text">TELVM_EGRESS_WORKLOADS</code>.
+          </div>
+          <div
+            :if={!row.egress_workload && !@egress_proxy_snapshot.enabled && @egress_proxy_snapshot.workloads != []}
+            class="text-[10px] font-mono mb-2"
+            style="color: var(--telvm-shell-muted);"
+          >
+            <span class="telvm-accent-dim-text">egress workloads configured but proxy disabled</span>
+            — enable
+            <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code>
+            (<.link patch={~p"/health"} class="underline telvm-accent-dim-text">Pre-flight</.link>).
+          </div>
+          <div class="text-[10px] font-mono mb-2" style="color: var(--telvm-shell-muted);">
+            <span :if={row.container_id}>id {String.slice(row.container_id, 0, 12)}…</span>
+            <span :if={!row.container_id}>
+              no container for this service in Compose project {compose_project_name()}
+            </span>
+          </div>
+          <button
+            type="button"
+            phx-click="verify_closed_agent"
+            phx-value-service={row.entry.compose_service}
+            phx-value-container-id={row.container_id || ""}
+            disabled={not row.running or @other_agents_verify_busy}
+            class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-btn-primary disabled:opacity-40"
+          >
+            {if @other_agents_verify_busy && @other_agents_verify_service == row.entry.compose_service,
+              do: "soaking…",
+              else: "Basic soak"}
+          </button>
+        </div>
+      </div>
+    </section>
+    """
+  end
+
   # --- Warm assets tab ---
 
   defp warm_assets(assigns) do
@@ -1893,7 +2214,11 @@ defmodule CompanionWeb.StatusLive do
           class="text-[9px] sm:text-[10px] font-mono leading-snug max-w-md lg:max-w-xl lg:text-right"
           style="color: var(--telvm-shell-muted);"
         >
-          Port preview or Monaco (files). Verify or soak on Machines.
+          Port preview or Monaco (files). Labs: verify on Machines. Closed agents listed here passed
+          <span class="telvm-accent-dim-text">Basic soak</span>
+          (CONNECT via companion egress + <span class="telvm-accent-dim-text">apt-get update</span>); vendor HTTPS is allow-listed per workload on companion (
+          <.link patch={~p"/health"} class="underline telvm-accent-dim-text">Pre-flight</.link>
+          ). Pull + soak from Vendor CLI agents on Machines.
         </p>
       </div>
 
@@ -1922,7 +2247,7 @@ defmodule CompanionWeb.StatusLive do
         </h2>
 
         <p class="text-[9px] font-mono mb-3" style="color: var(--telvm-shell-muted);">
-          Live snapshot: Compose stack (from Engine) + lab VMs (this tab). Refreshes with the warm list.
+          Live snapshot: Compose stack + warm rows (labs and verified closed agents). Refreshes with the warm list.
         </p>
         <pre
           class="telvm-panel-bg telvm-panel-border border rounded-sm p-3 w-full text-[10px] sm:text-[11px] font-mono whitespace-pre overflow-x-auto"
@@ -1950,7 +2275,7 @@ defmodule CompanionWeb.StatusLive do
         class="text-[11px] font-mono italic"
         style="color: var(--telvm-shell-muted);"
       >
-        No warm machines — run verify or certified soak on Machines, or leave a lab container up.
+        No warm rows — verify a lab on Machines, or run Basic soak for a vendor CLI agent under Machines (Compose must be running).
       </div>
 
       <div :if={@warm_machines != []} class={["space-y-3", @scroll_class]}>
@@ -1982,19 +2307,35 @@ defmodule CompanionWeb.StatusLive do
             </div>
 
             <div class="flex items-center gap-2 shrink-0">
-              <span class={live_activity_class(m, @soak_session, @preflight_session)}>
+              <span
+                :if={Map.get(m, :kind, :lab) != :closed_agent}
+                class={live_activity_class(m, @soak_session, @preflight_session)}
+              >
                 {live_activity_txt(m, @soak_session, @preflight_session)}
               </span>
-              <span class={soak_badge_class(@lab_readiness[m.id])}>
+              <span
+                :if={Map.get(m, :kind, :lab) != :closed_agent}
+                class={soak_badge_class(@lab_readiness[m.id])}
+              >
                 {soak_badge_txt(@lab_readiness[m.id])}
               </span>
-              <span class={port_probe_class(@lab_readiness[m.id], m.ports)}>
+              <span
+                :if={Map.get(m, :kind, :lab) != :closed_agent}
+                class={port_probe_class(@lab_readiness[m.id], m.ports)}
+              >
                 {port_probe_txt(@lab_readiness[m.id], m.ports)}
               </span>
               <span class={["font-medium text-[10px]", warm_status_class(m.status)]}>
-                {String.slice(m.status, 0, 4)}
+                <%= if Map.get(m, :kind, :lab) == :closed_agent do %>
+                  {m.status}
+                <% else %>
+                  {String.slice(m.status, 0, 4)}
+                <% end %>
               </span>
-              <div :if={warm_machine_running?(m)} class="flex flex-wrap items-center gap-1">
+              <div
+                :if={Map.get(m, :kind, :lab) != :closed_agent && warm_machine_running?(m)}
+                class="flex flex-wrap items-center gap-1"
+              >
                 <button
                   type="button"
                   phx-click="restart_machine"
@@ -2015,7 +2356,10 @@ defmodule CompanionWeb.StatusLive do
                 </button>
               </div>
 
-              <div :if={warm_machine_paused?(m)} class="flex flex-wrap items-center gap-1">
+              <div
+                :if={Map.get(m, :kind, :lab) != :closed_agent && warm_machine_paused?(m)}
+                class="flex flex-wrap items-center gap-1"
+              >
                 <button
                   type="button"
                   phx-click="unpause_machine"
@@ -2036,7 +2380,10 @@ defmodule CompanionWeb.StatusLive do
                 </button>
               </div>
 
-              <div :if={warm_machine_destroy_only?(m)} class="flex flex-wrap items-center gap-1">
+              <div
+                :if={Map.get(m, :kind, :lab) != :closed_agent && warm_machine_destroy_only?(m)}
+                class="flex flex-wrap items-center gap-1"
+              >
                 <button
                   type="button"
                   phx-click="destroy_machine"
@@ -2058,9 +2405,102 @@ defmodule CompanionWeb.StatusLive do
               endpoints
             </div>
 
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-col gap-2">
+              <div
+                :if={Map.get(m, :kind, :lab) == :closed_agent && Map.get(m, :egress_internal_url)}
+                class="flex flex-col gap-1.5"
+              >
+                <div class="text-[10px] uppercase tracking-[0.12em] font-semibold telvm-accent-dim-text">
+                  Egress
+                </div>
+                <div
+                  :if={Map.get(m, :egress_workload_id)}
+                  class="text-[10px] font-mono space-y-1"
+                  style="color: var(--telvm-shell-fg);"
+                >
+                  <div class="break-all">
+                    <span class="telvm-accent-dim-text">workload</span> {Map.get(m, :egress_workload_id)}
+                    <span style="color: var(--telvm-shell-muted);"> · </span>
+                    <span class="telvm-accent-dim-text">listener</span>
+                    {Map.get(m, :egress_internal_url)}
+                  </div>
+                  <div :if={Map.get(m, :egress_allow_digest)} class="break-all">
+                    <span class="telvm-accent-dim-text">allowlist</span> {Map.get(m, :egress_allow_digest)}
+                  </div>
+                  <p class="text-[9px] leading-snug" style="color: var(--telvm-shell-muted);">
+                    <code class="telvm-accent-dim-text">HTTP(S)_PROXY</code>
+                    points here; HTTPS is
+                    <code class="telvm-accent-dim-text">CONNECT</code>
+                    + allowlist in companion (
+                    <.link patch={~p"/health"} class="underline telvm-accent-dim-text">Pre-flight</.link>
+                    for denies).
+                  </p>
+                  <div :if={Map.get(m, :compose_service) && Map.get(m, :vendor_url)} class="space-y-0.5">
+                    <div class="text-[9px] uppercase tracking-wide telvm-accent-dim-text">
+                      Re-verify (repo root, Compose up)
+                    </div>
+                    <pre
+                      class="text-[9px] font-mono leading-snug p-2 rounded border overflow-x-auto select-all whitespace-pre-wrap"
+                      style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+                      title="Expect proxy_ok on stdout; docker exit code 0 means the probe succeeded."
+                    >{warm_closed_proxy_probe_command(m)}</pre>
+                    <p class="text-[9px] leading-snug" style="color: var(--telvm-shell-muted);">
+                      <code class="telvm-accent-dim-text">curl -sS -o /dev/null</code>
+                      prints nothing by design; this command then prints
+                      <code class="telvm-accent-dim-text">proxy_ok</code>
+                      or
+                      <code class="telvm-accent-dim-text">proxy_fail</code>
+                      . Same HTTPS path as Basic soak. PowerShell: you can also run
+                      <code class="telvm-accent-dim-text">echo $LASTEXITCODE</code>
+                      after any compose exec (expect
+                      <code class="telvm-accent-dim-text">0</code>
+                      ). CONNECT-only:
+                      <code class="telvm-accent-dim-text">dirteel egress-probe</code>
+                      with the same proxy and vendor URL when dirteel is installed.
+                    </p>
+                  </div>
+                </div>
+                <div
+                  :if={
+                    Map.get(m, :kind, :lab) == :closed_agent && Map.get(m, :egress_internal_url) &&
+                      !Map.get(m, :egress_workload_id) && @egress_proxy_snapshot.enabled
+                  }
+                  class="text-[10px] font-mono telvm-accent-dim-text break-all"
+                >
+                  listener {Map.get(m, :egress_internal_url)}
+                  <span class="block text-[9px] mt-1 telvm-text-warn" style="color: var(--telvm-shell-muted);">
+                    no matching egress workload for this port in companion config.
+                  </span>
+                </div>
+                <div
+                  :if={
+                    Map.get(m, :kind, :lab) == :closed_agent && !@egress_proxy_snapshot.enabled &&
+                      @egress_proxy_snapshot.workloads != []
+                  }
+                  class="text-[10px] font-mono"
+                  style="color: var(--telvm-shell-muted);"
+                >
+                  <span class="telvm-accent-dim-text">egress proxy configured but disabled</span>
+                  — set <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code> and restart companion (
+                  <.link patch={~p"/health"} class="underline telvm-accent-dim-text">Pre-flight</.link>
+                  ).
+                </div>
+                <div
+                  :if={
+                    Map.get(m, :kind, :lab) == :closed_agent && !@egress_proxy_snapshot.enabled &&
+                      @egress_proxy_snapshot.workloads == []
+                  }
+                  class="text-[10px] font-mono telvm-accent-dim-text break-all"
+                >
+                  egress {Map.get(m, :egress_internal_url)}
+                  <span class="block text-[9px] mt-1" style="color: var(--telvm-shell-muted);">
+                    companion egress workloads not loaded — see Pre-flight.
+                  </span>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
               <span
-                :if={m.ports == [] and m.internal_ports == []}
+                :if={Map.get(m, :kind, :lab) != :closed_agent && m.ports == [] and m.internal_ports == []}
                 class="text-xs"
                 style="color: var(--telvm-shell-muted);"
               >
@@ -2115,6 +2555,7 @@ defmodule CompanionWeb.StatusLive do
               >
                 <.icon name="hero-folder-open" class="size-3.5" /> files
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -2325,24 +2766,63 @@ defmodule CompanionWeb.StatusLive do
           >
             image ref / BYOI
           </label>
-          <input
-            type="text"
-            name="image_ref"
-            id="byoi-image-ref"
-            value={@selected_image}
-            phx-change="image_input_changed"
-            phx-debounce="300"
-            autocomplete="off"
-            placeholder="ghcr.io/org/image:tag"
-            disabled={@vm_preflight_busy}
-            class="w-full px-2 py-2 text-xs font-mono border rounded-md telvm-accent-ring disabled:opacity-50 placeholder:opacity-60"
-            style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
-          />
+          <div class="flex gap-2 items-stretch">
+            <input
+              type="text"
+              name="image_ref"
+              id="byoi-image-ref"
+              value={@selected_image}
+              phx-change="image_input_changed"
+              phx-debounce="300"
+              autocomplete="off"
+              placeholder="ghcr.io/org/image:tag"
+              disabled={@vm_preflight_busy}
+              class="min-w-0 flex-1 px-2 py-2 text-xs font-mono border rounded-md telvm-accent-ring disabled:opacity-50 placeholder:opacity-60"
+              style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
+            />
+            <button
+              type="button"
+              id="byoi-pull-btn"
+              phx-click="pull_byoi_image"
+              disabled={@image_pull_busy or @vm_preflight_busy or String.trim(@selected_image) == ""}
+              title={"Pull #{String.trim(@selected_image)}"}
+              class="shrink-0 px-3 py-2 text-[10px] uppercase tracking-wide rounded-md border telvm-pull-btn disabled:opacity-40"
+            >
+              {if @image_pull_busy, do: "…", else: "pull"}
+            </button>
+          </div>
           <p class="text-[10px] mt-1.5" style="color: var(--telvm-shell-muted);">
             Pick a chip or paste any Docker reference. Custom CMD may be required for verify to pass.
           </p>
         </div>
+
+        <div :if={@saved_pull_refs != []} class="mt-4 max-w-4xl" id="saved-pull-chips">
+          <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] mb-2 font-semibold">
+            pulled for verify / soak
+          </div>
+          <p class="text-[10px] mb-2 leading-snug" style="color: var(--telvm-shell-muted);">
+            Select a ref to load it into the field above, then run lab verification (same as BYOI).
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              :for={ref <- @saved_pull_refs}
+              type="button"
+              phx-click="select_pulled_chip"
+              phx-value-ref={ref}
+              title={ref}
+              class={[
+                "max-w-[220px] truncate rounded-md border px-2.5 py-1.5 text-left text-[10px] font-mono transition-colors",
+                "telvm-pull-btn hover:opacity-95",
+                @selected_image == ref && is_nil(@selected_catalog_id) &&
+                  "ring-2 ring-[color-mix(in_oklch,var(--telvm-accent)_45%,transparent)] border-[color-mix(in_oklch,var(--telvm-accent)_35%,transparent)]"
+              ]}
+            >
+              {trimmed_chip_label(ref)}
+            </button>
+          </div>
+        </div>
       </section>
+      {closed_agents_machines_section(assigns)}
       <%!-- Lab verification card --%>
       <section
         class="mb-5 rounded-sm telvm-panel-border border telvm-panel-bg telvm-verify-card p-3 sm:p-4"
@@ -2629,6 +3109,114 @@ defmodule CompanionWeb.StatusLive do
             <span class="telvm-text-danger-ink">unreachable</span>
             <span> - start with </span>
             <code class="telvm-accent-dim-text">Start-NetworkAgent.ps1</code>
+          </div>
+        </div>
+
+        <div class="telvm-panel-border border rounded p-3 space-y-2" style="width: 320px;">
+          <div class="flex items-baseline gap-2">
+            <span class="text-xs font-semibold" style="color: var(--telvm-shell-fg);">
+              egress proxy
+            </span>
+            <span class="text-[10px] font-mono" style="color: var(--telvm-shell-muted);">
+              Companion / OTP
+            </span>
+          </div>
+          <div
+            :if={not @egress_proxy_snapshot.enabled and @egress_proxy_snapshot.workloads == []}
+            class="text-[11px] font-mono"
+            style="color: var(--telvm-shell-muted);"
+          >
+            <span class="telvm-accent-dim-text">disabled</span>
+            <span> — set </span>
+            <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code>
+            <span> and </span>
+            <code class="telvm-accent-dim-text">TELVM_EGRESS_WORKLOADS</code>
+            <span> (see .env.example).</span>
+          </div>
+          <div
+            :if={not @egress_proxy_snapshot.enabled and @egress_proxy_snapshot.workloads != []}
+            class="text-[11px] font-mono space-y-1"
+            style="color: var(--telvm-shell-muted);"
+          >
+            <div>
+              <span class="telvm-accent-dim-text">configured but not running</span>
+              <span> — enable with </span>
+              <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code>
+              <span> and restart companion.</span>
+            </div>
+          </div>
+          <div class="space-y-2 text-[11px] font-mono">
+            <div
+              :if={@egress_proxy_snapshot.enabled}
+              class="flex flex-wrap gap-x-2 gap-y-1"
+              style="color: var(--telvm-shell-muted);"
+            >
+              <span>PubSub</span>
+              <span class="telvm-accent-dim-text">egress_proxy:updates</span>
+            </div>
+            <p
+              :if={@egress_proxy_snapshot.enabled and @egress_proxy_snapshot.workloads != []}
+              class="text-[10px] leading-snug"
+              style="color: var(--telvm-shell-muted);"
+            >
+              Other containers use
+              <code class="telvm-accent-dim-text">http://companion:4001</code>
+              /
+              <code class="telvm-accent-dim-text">:4002</code>
+              on the Compose bridge (see workload
+              <span class="telvm-accent-dim-text">proxy</span>
+              below). The host only exposes Phoenix on
+              <code class="telvm-accent-dim-text">localhost:4000</code>
+              ; egress listeners are inside the companion container. Canonical in-cluster check:
+              <.link patch={~p"/machines"} class="underline telvm-accent-dim-text">Machines</.link>
+              → Vendor CLI agents →
+              <span class="telvm-accent-dim-text">Basic soak</span>.
+            </p>
+            <div
+              :if={@egress_proxy_snapshot.workloads == []}
+              style="color: var(--telvm-shell-muted);"
+            >
+              No workloads in config.
+            </div>
+            <div :for={w <- @egress_proxy_snapshot.workloads} class="telvm-panel-border border rounded p-2 space-y-1">
+              <div class="flex flex-wrap gap-x-2">
+                <span style="color: var(--telvm-shell-muted);">id</span>
+                <span style="color: var(--telvm-shell-fg);">{w.id}</span>
+              </div>
+              <div class="flex flex-wrap gap-x-2">
+                <span style="color: var(--telvm-shell-muted);">proxy</span>
+                <span class="telvm-accent-dim-text break-all">{w.internal_url}</span>
+              </div>
+              <div class="flex flex-wrap gap-x-2">
+                <span style="color: var(--telvm-shell-muted);">allowlist</span>
+                <span class="telvm-accent-dim-text break-all">{w.allow_digest}</span>
+              </div>
+              <div class="flex flex-wrap gap-x-2">
+                <span style="color: var(--telvm-shell-muted);">auth inject</span>
+                <span :if={w.inject_auth_configured} class="telvm-text-ok">configured</span>
+                <span :if={not w.inject_auth_configured} style="color: var(--telvm-shell-muted);">off</span>
+              </div>
+            </div>
+            <div
+              :if={@egress_proxy_snapshot.enabled and @egress_proxy_snapshot.recent_denies != []}
+              class="space-y-1"
+            >
+              <div class="text-[10px] uppercase tracking-wide" style="color: var(--telvm-shell-muted);">
+                recent denies
+              </div>
+              <div
+                :for={d <- Enum.take(@egress_proxy_snapshot.recent_denies, 8)}
+                class="term-row text-[10px] break-all"
+              >
+                <span class="telvm-accent-dim-text">{d.workload_id}</span>
+                <span style="color: var(--telvm-shell-muted);"> · </span>
+                <span>{d.host}</span>
+                <span style="color: var(--telvm-shell-muted);"> · </span>
+                <span>{inspect(d.reason)}</span>
+                <span style="color: var(--telvm-shell-muted);"> · </span>
+                <span class="tabular-nums">{Calendar.strftime(d.at, "%H:%M:%S")}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -3075,10 +3663,156 @@ defmodule CompanionWeb.StatusLive do
     end
   end
 
+  defp fetch_warm_machines_merged do
+    egress_snap = Companion.EgressProxy.snapshot()
+
+    labs =
+      fetch_warm_machines()
+      |> Enum.map(&Map.put(&1, :kind, :lab))
+
+    labs ++ fetch_warm_closed_agents(egress_snap)
+  end
+
+  defp fetch_warm_closed_agents(egress_snap) do
+    verified = MapSet.new(ClosedAgentWarmRegistry.verified_ids())
+    docker = Companion.Docker.impl()
+
+    case docker.container_list(
+           filters: %{
+             "label" => ["telvm.agent=closed", "com.docker.compose.project=telvm"]
+           }
+         ) do
+      {:ok, containers} ->
+        containers
+        |> Enum.filter(&MapSet.member?(verified, &1["Id"]))
+        |> Enum.map(&closed_agent_warm_row(&1, egress_snap))
+
+      {:error, _} ->
+        []
+    end
+  end
+
+  defp closed_agent_warm_row(c, egress_snap) do
+    labels = c["Labels"] || %{}
+    service = labels["com.docker.compose.service"] || ""
+
+    entry =
+      ClosedAgentsCatalog.by_compose_service(service) ||
+        ClosedAgentsCatalog.by_product(labels["telvm.agent.product"] || "")
+
+    base = extract_warm_info(c)
+    port = if entry, do: entry.proxy_port, else: 4001
+    title = if entry, do: entry.label, else: base.name
+
+    workload =
+      Enum.find(egress_snap.workloads || [], fn w ->
+        match?(%{port: ^port}, w)
+      end)
+
+    vendor_url = if(entry, do: entry.vendor_url, else: nil)
+
+    egress_attrs = %{
+      egress_proxy_enabled: egress_snap.enabled,
+      egress_workload_id: if(workload, do: workload.id),
+      egress_allow_digest: if(workload, do: workload.allow_digest),
+      vendor_url: vendor_url
+    }
+
+    Map.merge(base, %{
+      kind: :closed_agent,
+      name: title,
+      ports: [],
+      internal_ports: [],
+      egress_internal_url: "http://companion:#{port}",
+      egress_proxy_port: port,
+      compose_service: service
+    })
+    |> Map.merge(egress_attrs)
+  end
+
+  defp warm_closed_proxy_probe_command(m) do
+    svc = Map.get(m, :compose_service) || "SERVICE"
+    port = Map.get(m, :egress_proxy_port) || 4001
+    vu = Map.get(m, :vendor_url) || "https://example.invalid/"
+
+    # sh -c so we can echo a line: bare curl -sS -o /dev/null prints nothing on success (confusing in PS).
+    # Catalog vendor_url values must not contain single quotes for this quoting.
+    "docker compose exec -T #{svc} sh -c 'curl -sS -o /dev/null --max-time 25 --proxy http://companion:#{port} #{vu} && echo proxy_ok || echo proxy_fail'"
+  end
+
+  defp egress_workload_for_port(egress_snap, port) when is_integer(port) do
+    Enum.find(egress_snap.workloads || [], fn w ->
+      match?(%{port: ^port}, w)
+    end)
+  end
+
+  defp egress_workload_for_port(_, _), do: nil
+
+  defp compose_project_name do
+    case System.get_env("TELVM_COMPOSE_PROJECT") do
+      nil -> "telvm"
+      "" -> "telvm"
+      p -> p |> String.trim()
+    end
+  end
+
+  defp fetch_other_agents_rows do
+    docker = Companion.Docker.impl()
+    proj = compose_project_name()
+
+    containers =
+      case docker.container_list(
+             filters: %{
+               "label" => [
+                 "telvm.agent=closed",
+                 "com.docker.compose.project=#{proj}"
+               ]
+             }
+           ) do
+        {:ok, c} -> c
+        _ -> []
+      end
+
+    by_service =
+      for c <- containers,
+          labels = c["Labels"] || %{},
+          svc = labels["com.docker.compose.service"],
+          is_binary(svc) and svc != "",
+          into: %{} do
+        {svc, c}
+      end
+
+    egress_snap = Companion.EgressProxy.snapshot()
+
+    Enum.map(ClosedAgentsCatalog.entries(), fn entry ->
+      c = Map.get(by_service, entry.compose_service)
+      running = c != nil && normalize_warm_list_state(c) == "running"
+      cid = if(c, do: c["Id"], else: nil)
+      in_warm = is_binary(cid) && ClosedAgentWarmRegistry.member?(cid) && running
+      wl = egress_workload_for_port(egress_snap, entry.proxy_port)
+
+      %{
+        entry: entry,
+        container: c,
+        running: running,
+        container_id: cid,
+        in_warm_registry: in_warm,
+        egress_workload: wl
+      }
+    end)
+  end
+
   defp refresh_warm_machine_assigns(socket) do
     socket =
       socket
-      |> assign(:warm_machines, fetch_warm_machines())
+      |> assign(:warm_machines, fetch_warm_machines_merged())
+
+    socket =
+      if socket.assigns.live_action == :machines do
+        assign(socket, :other_agents_rows, fetch_other_agents_rows())
+      else
+        socket
+      end
 
     if socket.assigns.live_action == :warm_assets do
       assign(socket, :compose_stack_snapshot, fetch_compose_stack_snapshot())
@@ -3257,7 +3991,7 @@ defmodule CompanionWeb.StatusLive do
     <nav class="flex flex-wrap gap-2 text-xs mb-4" aria-label="Companion views">
       <.link patch={~p"/warm"} class={nav_tab_class(@active, :warm_assets)}>Warm assets</.link>
       <.link patch={~p"/machines"} class={nav_tab_class(@active, :machines)}>Machines</.link>
-      <.link patch={~p"/agent"} class={nav_tab_class(@active, :agent_setup)}>Agent setup</.link>
+      <.link patch={~p"/oss-agents"} class={nav_tab_class(@active, :oss_agents)}>OSS Agents</.link>
       <.link patch={~p"/health"} class={nav_tab_class(@active, :preflight)}>Pre-flight</.link>
     </nav>
     """

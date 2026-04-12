@@ -58,7 +58,6 @@ services:
     command: ["sleep", "infinity"]
 
   # One-shot: wait for ollama API, then pull two small models (disk only; inference loads one at a time as needed).
-  # Override names via .env: TELVM_OLLAMA_MODEL_A / TELVM_OLLAMA_MODEL_B
   ollama_pull:
     image: ollama/ollama:latest
     depends_on:
@@ -66,8 +65,8 @@ services:
         condition: service_started
     environment:
       OLLAMA_HOST: http://ollama:11434
-      MODEL_A: ${TELVM_OLLAMA_MODEL_A:-qwen2.5:0.5b}
-      MODEL_B: ${TELVM_OLLAMA_MODEL_B:-tinyllama}
+      MODEL_A: qwen2.5:0.5b
+      MODEL_B: tinyllama
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -123,7 +122,7 @@ services:
       retries: 18
       start_period: 180s
     environment:
-      # Compose project label used when discovering closed-agent containers (later PRs add those services).
+      # Closed-agent discovery on Machines filters by com.docker.compose.project (default project name from compose file).
       TELVM_COMPOSE_PROJECT: ${TELVM_COMPOSE_PROJECT:-telvm}
       DATABASE_URL: postgres://postgres:postgres@db:5432/companion_dev
       PHX_HTTP_IP: 0.0.0.0
@@ -136,10 +135,10 @@ services:
       # Network agent: PowerShell ICS service on the Windows gateway (see agents/telvm-network-agent/README.md).
       # Discovers LAN hosts via ARP and probes each for a Zig node agent on :9100.
       TELVM_NETWORK_AGENT_URL: http://host.docker.internal:9225
-      # Optional: after publishing images/go-http-lab to GHCR, set in .env (see .env.example):
-      # TELVM_LAB_IMAGE=ghcr.io/<your-org>/telvm-go-http-lab:main
-      # TELVM_LAB_USE_IMAGE_CMD=1
-      # Per-workload HTTP CONNECT egress (see companion/lib/companion/egress_proxy). Disabled in :test.
+      # Per-workload egress proxy: closed-agent services use HTTP_PROXY=http://companion:4001|4002 (no .env required).
+      # allow_hosts: vendor HTTPS + Debian mirrors for apt through CONNECT. If Basic soak fails with denies in
+      # companion logs (egress_proxy) or Pre-flight "recent denies", add the missing hostname here and recreate companion.
+      # telvm_closed_* depends_on companion healthy so listeners start before those containers run.
       TELVM_EGRESS_ENABLED: "1"
       TELVM_EGRESS_WORKLOADS: '[{"id":"closed_claude","port":4001,"allow_hosts":["api.anthropic.com",".anthropic.com","deb.debian.org","security.debian.org",".debian.org"]},{"id":"closed_codex","port":4002,"allow_hosts":["api.openai.com",".openai.com","deb.debian.org","security.debian.org",".debian.org"]}]'
     depends_on:
@@ -165,13 +164,51 @@ services:
       - companion_assets_node:/app/assets/node_modules
       - /var/run/docker.sock:/var/run/docker.sock
       - ./images:/images:ro
+      - ./agents:/telvm-agents:ro
     environment:
       MIX_ENV: test
       TEST_DATABASE_URL: postgres://postgres:postgres@db:5432/companion_test
+      TELVM_DIRTEEL_PROFILES: /telvm-agents/dirteel/profiles/closed_images.json
     depends_on:
       db:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c", "mix deps.get && mix test"]
+
+  # Closed-agent CLIs (lab_relaxed). HTTP(S)_PROXY targets companion egress listeners (see TELVM_EGRESS_WORKLOADS above).
+  # Strict in-container iptables (upstream init-firewall) is a separate step — see docs/closed-agent-integration-test-matrix.md (C5/C6).
+  telvm_closed_claude:
+    build:
+      context: .
+      dockerfile: images/telvm-closed-claude/Dockerfile
+    labels:
+      telvm.agent: "closed"
+      telvm.agent.vendor: "anthropic"
+      telvm.agent.product: "claude-code"
+      telvm.agent.egress: "lab_relaxed"
+    environment:
+      HTTP_PROXY: http://companion:4001
+      HTTPS_PROXY: http://companion:4001
+      NO_PROXY: companion,db,ollama,localhost,127.0.0.1,host.docker.internal
+    depends_on:
+      companion:
+        condition: service_healthy
+
+  telvm_closed_codex:
+    build:
+      context: .
+      dockerfile: images/telvm-closed-codex/Dockerfile
+    labels:
+      telvm.agent: "closed"
+      telvm.agent.vendor: "openai"
+      telvm.agent.product: "codex"
+      telvm.agent.egress: "lab_relaxed"
+    environment:
+      HTTP_PROXY: http://companion:4002
+      HTTPS_PROXY: http://companion:4002
+      NO_PROXY: companion,db,ollama,localhost,127.0.0.1,host.docker.internal
+    depends_on:
+      companion:
+        condition: service_healthy
 
 volumes:
   telvm_pgdata:

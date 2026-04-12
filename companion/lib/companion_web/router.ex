@@ -22,6 +22,8 @@ defmodule CompanionWeb.Router do
 
     get "/", RedirectController, :to_health
     get "/topology", RedirectController, :to_warm
+    get "/agent", RedirectController, :to_oss_agents
+    get "/other-agents", RedirectController, :to_machines
     get "/telvm/api/fyi", FyiController, :show
 
     live_session :default,
@@ -29,7 +31,7 @@ defmodule CompanionWeb.Router do
       live "/health", StatusLive, :preflight
       live "/warm", StatusLive, :warm_assets
       live "/machines", StatusLive, :machines
-      live "/agent", StatusLive, :agent_setup
+      live "/oss-agents", StatusLive, :oss_agents
       live "/images", StatusLive, :legacy_images_redirect
       live "/vm-manager-preflight", StatusLive, :legacy_preflight_redirect
       live "/certificate", StatusLive, :legacy_certificate_redirect

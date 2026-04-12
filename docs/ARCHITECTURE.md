@@ -93,19 +93,20 @@ flowchart LR
 |------|------|
 | [`companion/lib/companion_web/endpoint.ex`](../companion/lib/companion_web/endpoint.ex) | **`ProxyPlug` runs before** the router so `/app/...` is proxied without hitting LiveView. |
 | [`companion/lib/companion_web/proxy_plug.ex`](../companion/lib/companion_web/proxy_plug.ex) | Parses `/app/<container>/port/<n>/…`, forwards with Finch, **502** if upstream fails. |
-| [`companion/lib/companion_web/router.ex`](../companion/lib/companion_web/router.ex) | LiveView routes (`/`, `/machines`, `/explore/:id`, **`/agent`**, …) and `/telvm/api/*` JSON API. |
+| [`companion/lib/companion_web/router.ex`](../companion/lib/companion_web/router.ex) | LiveView routes (`/`, `/machines`, `/explore/:id`, **`/oss-agents`** (legacy **`/agent`** redirects), legacy **`/other-agents`** → **`/machines`**, …) and `/telvm/api/*` JSON API. |
 | [`companion/lib/companion/docker/`](../companion/lib/companion/docker/) | Behaviour + **HTTP** (real socket) and **Mock** (tests). |
 | [`docker-compose.yml`](../docker-compose.yml) | Postgres, `vm_node`, **companion**, optional **Ollama** + **Goose** + **ollama_pull**, optional **`companion_test`** profile. |
 
-### Optional: Agent setup and CPU inference
+### Optional: OSS Agents and CPU inference
 
-The **Agent setup** tab (`/agent` in [`StatusLive`](../companion/lib/companion_web/live/status_live.ex)) is **additive**: it does not change **`ProxyPlug`** or **`/telvm/api`**.
+The **OSS Agents** tab (`/oss-agents` in [`StatusLive`](../companion/lib/companion_web/live/status_live.ex); legacy **`/agent`** redirects) is **additive**: it does not change **`ProxyPlug`** or **`/telvm/api`**.
 
 - **Model chat (Ollama or any OpenAI-compatible server):** [**`Companion.InferencePreflight`**](../companion/lib/companion/inference_preflight.ex) lists models; [**`Companion.InferenceChat`**](../companion/lib/companion/inference_chat.ex) posts to **`/v1/chat/completions`** using **Finch** to the configured base URL (same **`Companion.Finch`** pool as other outbound HTTP, **not** the `/app/…` proxy path).
 - **Goose agent:** [**`Companion.GooseRuntime`**](../companion/lib/companion/goose_runtime.ex) discovers a container with label **`telvm.goose=true`** and runs **`goose run --text`** via **`Companion.Docker.HTTP`** **exec** (same Engine API as Machines). This is **not** the same as **Warm assets** / lab containers (**`telvm.vm_manager_lab=true`**).
 - **Health:** [**`Companion.GooseHealth`**](../companion/lib/companion/goose_health.ex) periodically probes the Goose container and publishes to LiveView.
+- **Vendor CLI agents (on Machines):** closed vendor containers (**`telvm.agent=closed`**) can run **Basic soak** (Engine **exec**: curl via egress proxy + `apt-get update`); on success they register in **`Companion.ClosedAgentWarmRegistry`** and appear on **Warm assets** alongside labs (in-memory until companion restart). Compose project for discovery defaults to **`telvm`**; override with **`TELVM_COMPOSE_PROJECT`** if needed.
 
-Configure inference URLs and default model at runtime ([`config/runtime.exs`](../companion/config/runtime.exs)); operators configure Goose inside the Goose container (`goose configure`). See [quickstart — Ollama & Agent setup](quickstart.md#ollama-agent-setup--cpu-smoke).
+Configure inference URLs and default model at runtime ([`config/runtime.exs`](../companion/config/runtime.exs)); operators configure Goose inside the Goose container (`goose configure`). See [quickstart — Ollama & OSS Agents](quickstart.md#ollama-oss-agents--cpu-smoke).
 
 ## Host, Compose, and a single published port
 
@@ -129,7 +130,7 @@ Sandbox workloads are intended to have **no host port bindings** for the workloa
   └─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The default **Compose** file can also run **Ollama** (inference API on the bridge) and **Goose** (CLI agent container); the companion reaches Ollama over HTTP and the Goose container via **Engine exec** — see [Optional: Agent setup and CPU inference](#optional-agent-setup-and-cpu-inference) above.
+The default **Compose** file can also run **Ollama** (inference API on the bridge) and **Goose** (CLI agent container); the companion reaches Ollama over HTTP and the Goose container via **Engine exec** — see [Optional: OSS Agents and CPU inference](#optional-oss-agents-and-cpu-inference) above.
 
 ## Preview URL shape (reverse proxy)
 
@@ -237,6 +238,8 @@ The [`companion_test`](../docker-compose.yml) service runs `mix deps.get && mix 
 
 **Optional (host):** `cd companion && mix test` when Postgres is on `localhost` and test env vars are unset.
 
+**Optional (integration, egress):** with the default **`docker compose up`** stack running on the host, **`make smoke-closed-egress`** runs [`scripts/verify-closed-agent-egress.sh`](../scripts/verify-closed-agent-egress.sh) (see [quickstart — Tests](quickstart.md#tests)). This exercises real Engine + vendor **`curl`** paths; it is not part of ExUnit.
+
 **Ad-hoc:**
 
 ```bash
@@ -256,7 +259,7 @@ docker compose run --rm --entrypoint "" \
 - [`CompanionWeb.StatusLive`](../companion/test/companion_web/live/status_live_test.exs)
 - [`Companion.VmLifecycle.Runner`](../companion/test/companion/vm_lifecycle_runner_test.exs)
 
-**Later:** real-Engine tests tagged (e.g. `@tag :docker`) behind `RUN_DOCKER_TESTS=1`.
+**Later:** real-Engine ExUnit tagged (e.g. `@tag :docker`) behind `RUN_DOCKER_TESTS=1`; until then prefer **`make smoke-closed-egress`** for closed-agent egress regressions.
 
 ## Layout
 
