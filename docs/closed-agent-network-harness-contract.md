@@ -114,8 +114,13 @@ Rules:
 
 ## 6. Companion integration points
 
-- **Existing:** `TELVM_NETWORK_AGENT_URL`, `NetworkAgentPoller`, Pre-flight LiveView section.
-- **Future:** Provisioning tab reads the same snapshot for **Plane A** context; Docker adapter supplies **Plane B**; secrets remain **Plane C** operator-owned.
+- **Existing:** `TELVM_NETWORK_AGENT_URL`, `NetworkAgentPoller`, Pre-flight LiveView section (ICS / LAN context only — not Docker egress enforcement).
+- **Egress enforcement (two layers, complementary):**
+  1. **In-container (strict tier):** Upstream-style `init-firewall` / iptables allowlist in the **closed-agent container** netns (see §3). Requires `NET_ADMIN` / `NET_RAW` when you adopt that profile.
+  2. **Companion Elixir proxy (optional):** One HTTP listener per configured **workload** (`TELVM_EGRESS_ENABLED`, `TELVM_EGRESS_WORKLOADS` or `TELVM_EGRESS_WORKLOADS_FILE`). Agents point `HTTP_PROXY` / `HTTPS_PROXY` at `http://companion:<port>`. Policy is host/SNI allowlist plus structured JSON denies; the allowlist must include **any host `apt` / `npm` / other tooling** will reach (e.g. **`.debian.org`** for `apt-get update` through the proxy), not only vendor API domains. Vendor `Authorization` may be injected from **runtime env** named per workload (`authorization_env`) — **not** from Postgres or the UI DB.
+- **Dashboard:** Pre-flight shows proxy rows (internal URL, allowlist digest, recent denies) and PubSub `egress_proxy:updates`. This is **read-only** LiveView; proxy processes run under `Companion.EgressProxy.Supervisor`, not inside the LiveView process.
+- **Bypass caveat:** Tools that ignore `HTTP_PROXY` / `HTTPS_PROXY` can still attempt direct egress; strict **in-container** firewall is the backstop for those paths when enabled.
+- **Future:** Provisioning tab may read the same snapshots for **Plane A** context; Docker adapter supplies **Plane B** container facts; secrets remain **Plane C** operator-owned.
 
 ---
 
