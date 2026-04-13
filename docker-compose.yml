@@ -109,6 +109,8 @@ services:
       - ./scripts:/telvm-scripts:ro
       # Zig agent source for in-container `docker build` (retardeel verifier).
       - ./agents:/agents:ro
+      # Morayeel Playwright run artifacts (headless browser lab).
+      - morayeel_runs:/morayeel-runs
     ports:
       - "4000:4000"
     healthcheck:
@@ -140,7 +142,8 @@ services:
       # companion logs (egress_proxy) or Pre-flight "recent denies", add the missing hostname here and recreate companion.
       # telvm_closed_* depends_on companion healthy so listeners start before those containers run.
       TELVM_EGRESS_ENABLED: "1"
-      TELVM_EGRESS_WORKLOADS: '[{"id":"closed_claude","port":4001,"allow_hosts":["api.anthropic.com",".anthropic.com","deb.debian.org","security.debian.org",".debian.org"]},{"id":"closed_codex","port":4002,"allow_hosts":["api.openai.com",".openai.com","deb.debian.org","security.debian.org",".debian.org"]}]'
+      # morayeel workload :4003 — Playwright uses HTTP_PROXY to companion; allow in-cluster lab host.
+      TELVM_EGRESS_WORKLOADS: '[{"id":"closed_claude","port":4001,"allow_hosts":["api.anthropic.com",".anthropic.com","deb.debian.org","security.debian.org",".debian.org"]},{"id":"closed_codex","port":4002,"allow_hosts":["api.openai.com",".openai.com","deb.debian.org","security.debian.org",".debian.org"]},{"id":"morayeel","port":4003,"allow_hosts":["morayeel_lab"]}]'
     depends_on:
       db:
         condition: service_healthy
@@ -148,6 +151,16 @@ services:
         condition: service_started
       ollama:
         condition: service_started
+      morayeel_lab:
+        condition: service_started
+
+  # Minimal HTTP lab for Morayeel (synthetic session cookie; no real auth).
+  morayeel_lab:
+    build:
+      context: ./agents/morayeel/lab
+      dockerfile: Dockerfile
+    labels:
+      telvm.lab: "morayeel"
 
   # One-shot test runner (canonical local/CI-style run inside Linux). Does not start phx.server.
   # Usage: docker compose --profile test run --rm companion_test
@@ -217,3 +230,4 @@ volumes:
   companion_assets_node:
   ollama_data:
   goose_config:
+  morayeel_runs:

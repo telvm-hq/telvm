@@ -17,6 +17,7 @@
 
 - **Egress proxy hardening:** listener no longer applies fragile `setopts` after `accept` (avoids RST / curl 56); **CONNECT** parsing fixed so `host:port` is not swallowed into the host token (avoids spurious `malformed_connect` / 403).
 - **dirteel** ([`agents/dirteel`](agents/dirteel)): static Zig **CONNECT** probe + **`profiles/closed_images.json`** aligned with [`ClosedAgents.Catalog`](companion/lib/companion/closed_agents/catalog.ex); **`make check-dirteel-catalog`**; closed images ship **`/usr/local/bin/dirteel`**; Basic soak prefers dirteel when present ([`ClosedAgents.Verify`](companion/lib/companion/closed_agents/verify.ex)).
+- **morayeel** ([`agents/morayeel`](agents/morayeel)): Playwright headless lab on **`telvm_default`**; artifacts on **`morayeel_runs`**; **Morayeel** tab in companion ([`docs/morayeel-verification.md`](docs/morayeel-verification.md)).
 - **Operator UI:** Warm assets and Machines **Vendor CLI** surface workload id, listener URL, and allowlist next to Pre-flight; **Re-verify** command prints **`proxy_ok`** / **`proxy_fail`** so silent `curl` is not mistaken for a hang.
 
 ### Suggested PR split (current work)
