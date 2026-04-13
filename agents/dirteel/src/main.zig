@@ -354,3 +354,56 @@ pub fn main() !void {
     try printUsageMain();
     std.process.exit(2);
 }
+
+test "parseVendorUrl https default port strips path" {
+    const url = "https://api.example.com/v1/foo";
+    const r = parseVendorUrl(url);
+    try std.testing.expectEqualStrings("api.example.com", r.host);
+    try std.testing.expectEqual(@as(u16, 443), r.port);
+}
+
+test "parseVendorUrl https explicit port strips query" {
+    const url = "https://host.example:8443/path?x=1";
+    const r = parseVendorUrl(url);
+    try std.testing.expectEqualStrings("host.example", r.host);
+    try std.testing.expectEqual(@as(u16, 8443), r.port);
+}
+
+test "parseVendorUrl http default port" {
+    const url = "http://legacy.vendor/";
+    const r = parseVendorUrl(url);
+    try std.testing.expectEqualStrings("legacy.vendor", r.host);
+    try std.testing.expectEqual(@as(u16, 443), r.port);
+}
+
+test "parseVendorUrl bracketed IPv6 with port" {
+    const url = "https://[::1]:8443/";
+    const r = parseVendorUrl(url);
+    try std.testing.expectEqualStrings("[::1]", r.host);
+    try std.testing.expectEqual(@as(u16, 8443), r.port);
+}
+
+test "parseVendorUrl bracketed IPv6 explicit 443" {
+    const url = "https://[2001:db8::1]:443/path";
+    const r = parseVendorUrl(url);
+    try std.testing.expectEqualStrings("[2001:db8::1]", r.host);
+    try std.testing.expectEqual(@as(u16, 443), r.port);
+}
+
+test "profileLess orders by compose_service" {
+    const late = Profile{
+        .compose_service = "zebra",
+        .proxy_port = 1,
+        .vendor_url = "https://x",
+        .product = "p",
+    };
+    const early = Profile{
+        .compose_service = "alpha",
+        .proxy_port = 2,
+        .vendor_url = "https://y",
+        .product = "q",
+    };
+    try std.testing.expect(profileLess({}, early, late));
+    try std.testing.expect(!profileLess({}, late, early));
+    try std.testing.expect(!profileLess({}, early, early));
+}

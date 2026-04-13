@@ -26,5 +26,11 @@ jobs:
           npm test
           npm run build
 
+      - name: dirteel (Zig 0.13 unit tests)
+        run: |
+          curl -fsSL https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz | tar -xJ
+          echo "${{ github.workspace }}/zig-linux-x86_64-0.13.0" >> "$GITHUB_PATH"
+          cd agents/dirteel && zig build test
+
       - name: Run ExUnit via Docker Compose
         run: docker compose --profile test run --rm companion_test
