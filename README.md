@@ -67,6 +67,8 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 
 ## Start here (~60 seconds)
 
+**Wiki / positioning:** single doc index plus the politely scathing landscape — [docs/wiki/README.md](docs/wiki/README.md).
+
 1. **Run:** `git clone https://github.com/telvm-hq/telvm.git && cd telvm && docker compose up --build`  
    Default stack: **Postgres**, **`vm_node`**, **Ollama** + one-shot **`ollama_pull`**, **Goose**, **companion** on **`http://localhost:4000`**, **`telvm_closed_claude`** / **`telvm_closed_codex`** (vendor CLIs with **`HTTP_PROXY`** to the companion’s egress listeners on **4001** / **4002**). No **`.env`** file is required — defaults are in **`docker-compose.yml`**. After the stack is healthy, verify proxy path: **`./scripts/verify-closed-agent-egress.sh`** (or **`scripts/verify-closed-agent-egress.ps1`** on Windows) — vendor **`curl`** checks plus **`apt-get update`** through the proxy — then **`docker compose logs companion`** and search for **`egress_proxy`** (e.g. **`grep egress_proxy`** or **`findstr egress_proxy`**).
 
