@@ -16,6 +16,7 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ ~s(href="/warm")
     assert html =~ ~s(href="/machines")
     assert html =~ ~s(href="/oss-agents")
+    assert html =~ ~s(href="/morayeel")
     assert html =~ "/health"
     assert html =~ "api reference"
   end
@@ -46,6 +47,18 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ ~s(href="/oss-agents")
     assert html =~ ~s(href="/warm")
     assert html =~ ~s(href="/machines")
+    assert html =~ ~s(href="/morayeel")
+  end
+
+  test "GET /morayeel renders headless lab panel", %{conn: conn} do
+    conn = get(conn, ~p"/morayeel")
+    html = html_response(conn, 200)
+    assert html =~ ~s(id="morayeel-panel")
+    assert html =~ "telvm · morayeel"
+    assert html =~ "NO_PROXY"
+    assert html =~ ~s(phx-click="morayeel_run")
+    assert html =~ ~s(href="/morayeel")
+    assert html =~ ~s(href="/warm")
   end
 
   test "GET /other-agents redirects to /machines", %{conn: conn} do
@@ -70,6 +83,7 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ ~s(href="/warm")
     assert html =~ ~s(href="/machines")
     assert html =~ ~s(href="/health")
+    assert html =~ ~s(href="/morayeel")
     refute html =~ ~s(href="/topology")
   end
 

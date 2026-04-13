@@ -16,6 +16,7 @@ defmodule CompanionWeb.StatusLive do
   alias Companion.EgressProxy
   alias Companion.ClosedAgents.Catalog, as: ClosedAgentsCatalog
   alias Companion.ClosedAgentWarmRegistry
+  alias Companion.MorayeelRunner
   alias Companion.SavedLabImages
 
   @default_entry LabCatalog.get(:cert_phoenix)
@@ -91,6 +92,7 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:other_agents_verify_error, nil)
       |> assign(:saved_pull_refs, SavedLabImages.list_refs_for_chips())
       |> assign(:closed_agents_tab, "claude")
+      |> assign(:morayeel, MorayeelRunner.snapshot())
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Companion.PubSub, Preflight.topic())
@@ -102,6 +104,7 @@ defmodule CompanionWeb.StatusLive do
       Phoenix.PubSub.subscribe(Companion.PubSub, NetworkAgentPoller.topic())
       Phoenix.PubSub.subscribe(Companion.PubSub, EgressProxy.topic())
       Phoenix.PubSub.subscribe(Companion.PubSub, Companion.RetardeelVerifier.topic())
+      Phoenix.PubSub.subscribe(Companion.PubSub, MorayeelRunner.topic())
 
       if socket.assigns.live_action == :oss_agents do
         send(self(), :load_goose_panel)
@@ -149,6 +152,9 @@ defmodule CompanionWeb.StatusLive do
 
         {:noreply, socket}
 
+      :morayeel ->
+        {:noreply, assign(socket, :page_title, page_title(socket))}
+
       _ ->
         {:noreply, assign(socket, :page_title, page_title(socket))}
     end
@@ -159,6 +165,7 @@ defmodule CompanionWeb.StatusLive do
       :machines -> "Machines"
       :warm_assets -> "Warm assets"
       :oss_agents -> "OSS Agents"
+      :morayeel -> "Morayeel"
       _ -> "Pre-flight"
     end
   end
@@ -190,6 +197,7 @@ defmodule CompanionWeb.StatusLive do
 
   defp mission_tab?(:machines), do: true
   defp mission_tab?(:warm_assets), do: true
+  defp mission_tab?(:morayeel), do: true
   defp mission_tab?(_), do: false
 
   # --- PubSub handlers ---
@@ -498,6 +506,37 @@ defmodule CompanionWeb.StatusLive do
     else
       {:noreply, socket}
     end
+  end
+
+  def handle_info({:morayeel_run, payload}, socket) do
+    snap = MorayeelRunner.snapshot()
+
+    socket =
+      socket
+      |> assign(:morayeel, snap)
+      |> then(fn s ->
+        case payload do
+          %{event: :rejected, message: msg} when is_binary(msg) ->
+            put_flash(s, :error, msg)
+
+          %{event: :finished} ->
+            cond do
+              snap.status == :passed ->
+                put_flash(s, :info, "Morayeel run #{snap.run_id} passed")
+
+              snap.status == :failed ->
+                put_flash(s, :error, snap.error || "Morayeel run failed")
+
+              true ->
+                s
+            end
+
+          _ ->
+            s
+        end
+      end)
+
+    {:noreply, socket}
   end
 
   def handle_info({:goose_chat_done, result}, socket) do
@@ -1122,6 +1161,11 @@ defmodule CompanionWeb.StatusLive do
   # --- Events: retardeel verifier ---
 
   @impl true
+  def handle_event("morayeel_run", _params, socket) do
+    MorayeelRunner.run()
+    {:noreply, assign(socket, :morayeel, MorayeelRunner.snapshot())}
+  end
+
   def handle_event("verify_retardeel", _params, socket) do
     cond do
       socket.assigns.live_action != :oss_agents ->
@@ -1441,6 +1485,9 @@ defmodule CompanionWeb.StatusLive do
 
       :oss_agents ->
         oss_agents(assigns)
+
+      :morayeel ->
+        morayeel(assigns)
 
       action
       when action in [
@@ -2188,6 +2235,123 @@ defmodule CompanionWeb.StatusLive do
         </div>
       </div>
     </section>
+    """
+  end
+
+  # --- Morayeel (headless Playwright lab) ---
+
+  defp morayeel(assigns) do
+    rid = assigns.morayeel[:run_id] || assigns.morayeel[:last_run_id]
+
+    assigns = assign(assigns, :morayeel_artifact_rid, rid)
+
+    ~H"""
+    <div class="telvm-terminal telvm-console-shell px-3 py-3 sm:px-4 sm:py-4" id="morayeel-panel">
+      <.terminal_nav active={@live_action} />
+      <div class="flex flex-wrap items-end justify-between gap-2 telvm-accent-border-b border-b pb-2 mb-4">
+        <div class="text-[11px] sm:text-xs uppercase tracking-[0.2em] telvm-accent-text font-semibold">
+          telvm · morayeel
+        </div>
+      </div>
+
+      <p
+        class="telvm-prose-bar text-[11px] mb-5 font-mono leading-relaxed max-w-2xl border-l-2 pl-2"
+        style="color: var(--telvm-shell-muted);"
+      >
+        Headless Chromium (Playwright) runs inside Docker on
+        <span class="telvm-accent-dim-text font-mono">telvm_default</span>.
+        The container sets <span class="telvm-accent-dim-text font-mono">HTTP_PROXY=http://companion:4003</span>
+        (egress workload <span class="telvm-accent-dim-text">morayeel</span>, allowlist
+        <span class="font-mono telvm-accent-dim-text">morayeel_lab</span>) while
+        <span class="font-mono telvm-accent-dim-text">NO_PROXY</span> includes
+        <span class="font-mono telvm-accent-dim-text">morayeel_lab</span> so the first-party lab is reached
+        <span class="telvm-accent-dim-text">directly</span> on the compose network (Chromium reliably persists
+        <span class="font-mono telvm-accent-dim-text">Set-Cookie</span> into
+        <span class="font-mono telvm-accent-dim-text">storageState.json</span>). Writes
+        <span class="font-mono telvm-accent-dim-text">storageState.json</span>,
+        <span class="font-mono telvm-accent-dim-text">network.har</span>, and
+        <span class="font-mono telvm-accent-dim-text">run.json</span> on the shared volume under
+        <span class="font-mono telvm-accent-dim-text">morayeel_runs/</span> (one directory per run id).
+        See <span class="font-mono telvm-accent-dim-text">docs/morayeel-verification.md</span>.
+      </p>
+
+      <section class="rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4 mb-4 space-y-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] font-semibold">
+            status
+          </span>
+          <span class="font-mono text-xs">{inspect(@morayeel.status)}</span>
+          <span :if={@morayeel[:run_id]} class="telvm-muted-xs font-mono">
+            run {@morayeel[:run_id]}
+          </span>
+          <span :if={@morayeel[:exit_code] != nil} class="telvm-muted-xs font-mono">
+            exit {@morayeel[:exit_code]}
+          </span>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button
+            type="button"
+            phx-click="morayeel_run"
+            disabled={@morayeel.status == :running}
+            class={[
+              "px-3 py-1 text-[11px] font-mono border rounded-sm",
+              @morayeel.status == :running && "opacity-50 cursor-not-allowed",
+              @morayeel.status != :running && "telvm-btn-primary"
+            ]}
+          >
+            {if @morayeel.status == :running, do: "Running…", else: "Run headless lab"}
+          </button>
+        </div>
+
+        <div :if={is_map(@morayeel[:summary])} class="text-[11px] font-mono space-y-1 telvm-muted-xs">
+          <div>
+            cookies: {Map.get(@morayeel[:summary], :cookie_count, 0)} —
+            {Enum.join(Map.get(@morayeel[:summary], :cookie_names, []), ", ")}
+          </div>
+          <div :if={Map.get(@morayeel[:summary], :origins, []) != []}>
+            domains: {Enum.join(Map.get(@morayeel[:summary], :origins, []), ", ")}
+          </div>
+        </div>
+
+        <div :if={@morayeel_artifact_rid} class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono">
+          <a
+            class="underline telvm-accent-dim-text"
+            href={~p"/telvm/morayeel/artifacts/#{@morayeel_artifact_rid}/storageState.json"}
+          >
+            storageState.json
+          </a>
+          <a
+            class="underline telvm-accent-dim-text"
+            href={~p"/telvm/morayeel/artifacts/#{@morayeel_artifact_rid}/network.har"}
+          >
+            network.har
+          </a>
+          <a
+            class="underline telvm-accent-dim-text"
+            href={~p"/telvm/morayeel/artifacts/#{@morayeel_artifact_rid}/run.json"}
+          >
+            run.json
+          </a>
+          <a
+            class="underline telvm-accent-dim-text"
+            href={~p"/telvm/morayeel/artifacts/#{@morayeel_artifact_rid}/runner.log"}
+          >
+            runner.log
+          </a>
+        </div>
+
+        <div :if={@morayeel[:docker_log] != "" && @morayeel[:docker_log]} class="space-y-1">
+          <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] font-semibold">
+            docker log (tail)
+          </div>
+          <pre
+            class="h-48 overflow-auto p-2 text-[10px] font-mono rounded-sm whitespace-pre-wrap break-all"
+            style="border: 1px solid var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-muted);"
+          >{@morayeel[:docker_log]}</pre>
+        </div>
+      </section>
+    </div>
     """
   end
 
@@ -3992,6 +4156,7 @@ defmodule CompanionWeb.StatusLive do
       <.link patch={~p"/warm"} class={nav_tab_class(@active, :warm_assets)}>Warm assets</.link>
       <.link patch={~p"/machines"} class={nav_tab_class(@active, :machines)}>Machines</.link>
       <.link patch={~p"/oss-agents"} class={nav_tab_class(@active, :oss_agents)}>OSS Agents</.link>
+      <.link patch={~p"/morayeel"} class={nav_tab_class(@active, :morayeel)}>Morayeel</.link>
       <.link patch={~p"/health"} class={nav_tab_class(@active, :preflight)}>Pre-flight</.link>
     </nav>
     """

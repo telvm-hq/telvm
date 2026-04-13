@@ -26,12 +26,15 @@ defmodule CompanionWeb.Router do
     get "/other-agents", RedirectController, :to_machines
     get "/telvm/api/fyi", FyiController, :show
 
+    get "/telvm/morayeel/artifacts/:run_id/:filename", MorayeelArtifactController, :show
+
     live_session :default,
       layout: {CompanionWeb.Layouts, :app} do
       live "/health", StatusLive, :preflight
       live "/warm", StatusLive, :warm_assets
       live "/machines", StatusLive, :machines
       live "/oss-agents", StatusLive, :oss_agents
+      live "/morayeel", StatusLive, :morayeel
       live "/images", StatusLive, :legacy_images_redirect
       live "/vm-manager-preflight", StatusLive, :legacy_preflight_redirect
       live "/certificate", StatusLive, :legacy_certificate_redirect

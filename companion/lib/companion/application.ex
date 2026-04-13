@@ -24,6 +24,7 @@ defmodule Companion.Application do
         [
           {Companion.GooseHealth, Application.get_env(:companion, Companion.GooseHealth, [])},
           Companion.RetardeelVerifier,
+          Companion.MorayeelRunner,
           CompanionWeb.Endpoint
         ]
 

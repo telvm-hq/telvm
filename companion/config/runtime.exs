@@ -71,6 +71,22 @@ config :companion, Companion.EgressProxy,
   enabled: egress_enabled,
   workloads: egress_workloads
 
+morayeel_artifacts_dir =
+  case System.get_env("TELVM_MORAYEEL_ARTIFACTS_DIR") do
+    d when is_binary(d) and d != "" -> d
+    _ -> if config_env() == :test, do: Path.join(System.tmp_dir!(), "telvm-morayeel-test"), else: "/morayeel-runs"
+  end
+
+config :companion, Companion.MorayeelRunner,
+  artifacts_dir: morayeel_artifacts_dir,
+  lab_url: System.get_env("TELVM_MORAYEEL_LAB_URL") || "http://morayeel_lab:8080/",
+  docker_network: System.get_env("TELVM_LAB_DOCKER_NETWORK") || "telvm_default",
+  http_proxy: System.get_env("TELVM_MORAYEEL_HTTP_PROXY") || "http://companion:4003",
+  image: System.get_env("TELVM_MORAYEEL_IMAGE") || "morayeel:latest",
+  dockerfile_path: System.get_env("TELVM_MORAYEEL_DOCKERFILE") || "/agents/morayeel/Dockerfile",
+  build_context: System.get_env("TELVM_MORAYEEL_BUILD_CONTEXT") || "/agents/morayeel",
+  skip_docker: config_env() == :test
+
 # Use Docker Engine HTTP adapter when the Unix socket is present (e.g. docker compose).
 unless config_env() == :test do
   sock = Application.get_env(:companion, :docker_socket, "/var/run/docker.sock")
