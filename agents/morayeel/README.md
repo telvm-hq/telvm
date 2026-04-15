@@ -2,6 +2,8 @@
 
 Headless **Playwright / Chromium** lab agent for telvm: drive an in-cluster **HTTP lab**, export **`storageState.json`**, **`network.har`**, and **`run.json`** under a deterministic per-run directory (same spirit as [dirteel](../dirteel/README.md) egress probes, but for browser session artifacts).
 
+**Capture modes:** `MORAYEEL_CAPTURE=oneshot` (default) performs one navigation and exits. `MORAYEEL_CAPTURE=session` opens Chromium with **remote debugging (CDP)** on `0.0.0.0:${MORAYEEL_CDP_PORT:-9222}`, refreshes **`storageState.json`** on an interval until you send **SIGINT/SIGTERM** or create **`morayeel.done`** in `OUT_DIR`, then closes the context so **`network.har`** is finalized. Use session mode when you need a human-driven tape (e.g. classic WebForms / DevExpress second POST); see [morayeel_additions.md](morayeel_additions.md).
+
 ## Flow
 
 ```
@@ -42,6 +44,46 @@ docker compose run --rm \
 ```
 
 Expect `storageState.json` with cookie name `morayeel_lab_cookie` and `run.json` with `"status":"passed"`.
+
+## Environment variables
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `TARGET_URL` | `http://morayeel_lab:8080/` | First page to open. |
+| `OUT_DIR` | `/artifacts/run` | Directory for `storageState.json`, `network.har`, `run.json`, `runner.log`, optional `last.png`. |
+| `HTTP_PROXY` / `HTTPS_PROXY` | (unset) | Forwarded to Playwright context when set. |
+| `MORAYEEL_CAPTURE` | `oneshot` | `oneshot` or `session`. |
+| `MORAYEEL_CDP_PORT` | `9222` | Remote debugging port when `session` (must publish with Docker `-p`). |
+| `MORAYEEL_STORAGE_SNAPSHOT_MS` | `30000` | Minimum milliseconds between periodic `storageState.json` writes in `session`. |
+| `MORAYEEL_SESSION_MAX_MS` | `0` | If `> 0`, end session with `shutdown_reason: timeout` after this many ms. |
+
+Successful runs include a **`capture`** object in `run.json` (`version`, `mode`; in `session`, `request_summary` and `session` metadata including `shutdown_reason`).
+
+## Session mode (CDP observer)
+
+1. Publish the CDP port to your host (example uses default **9222**):
+
+```bash
+docker compose run --rm \
+  --network telvm_default \
+  -p 9222:9222 \
+  -v morayeel_runs:/artifacts \
+  -e MORAYEEL_CAPTURE=session \
+  -e TARGET_URL=http://morayeel_lab:8080/ \
+  -e OUT_DIR=/artifacts/session-demo \
+  -e HTTP_PROXY=http://companion:4003 \
+  -e HTTPS_PROXY=http://companion:4003 \
+  -e NO_PROXY=companion,db,ollama,localhost,127.0.0.1,morayeel_lab \
+  morayeel:latest
+```
+
+2. Attach with Chrome **Inspect** targets or `curl http://127.0.0.1:9222/json/version` (host port must match `-p`).
+
+3. When finished, either create **`$OUT_DIR/morayeel.done`** inside the container (e.g. `docker exec <container> touch /artifacts/session-demo/morayeel.done` while it runs) or stop the container (**SIGTERM**).
+
+**Security:** CDP is **full control** of the browser; map **localhost** only and never expose it on a public interface. **`network.har`** can contain secrets (including login POST bodies); treat artifacts like credentials.
+
+**HAR semantics:** Playwright writes a complete **`network.har`** when the **browser context** is closed. During `session`, the file on disk may be incomplete until shutdown finalizes it.
 
 ## Pinning
 
