@@ -17,6 +17,7 @@ defmodule CompanionWeb.StatusLive do
   alias Companion.ClosedAgents.Catalog, as: ClosedAgentsCatalog
   alias Companion.ClosedAgentWarmRegistry
   alias Companion.MorayeelRunner
+  alias Companion.Morayeel.OperatorGuide
   alias Companion.SavedLabImages
 
   @default_entry LabCatalog.get(:cert_phoenix)
@@ -93,6 +94,7 @@ defmodule CompanionWeb.StatusLive do
       |> assign(:saved_pull_refs, SavedLabImages.list_refs_for_chips())
       |> assign(:closed_agents_tab, "claude")
       |> assign(:morayeel, MorayeelRunner.snapshot())
+      |> assign(:morayeel_operator_guide, OperatorGuide.data())
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Companion.PubSub, Preflight.topic())
@@ -1515,7 +1517,7 @@ defmodule CompanionWeb.StatusLive do
           telvm · oss agents
         </div>
       </div>
-
+      
       <p
         class="telvm-prose-bar text-[11px] mb-5 font-mono leading-relaxed max-w-2xl border-l-2 pl-2"
         style="color: var(--telvm-shell-muted);"
@@ -1526,7 +1528,7 @@ defmodule CompanionWeb.StatusLive do
         tab starts a direct chat when models are listed (default model from <span class="font-mono telvm-accent-dim-text">TELVM_AGENT_DEFAULT_MODEL</span>).
         Weights live in your inference server, not in Phoenix.
       </p>
-
+      
       <div class="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
         <div class="min-w-0 space-y-5 max-w-xl">
           <section
@@ -1559,7 +1561,7 @@ defmodule CompanionWeb.StatusLive do
                   when the inference service shares the stack network.
                 </p>
               </div>
-
+              
               <div>
                 <label
                   for="inference-api-key"
@@ -1579,7 +1581,7 @@ defmodule CompanionWeb.StatusLive do
                   style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
                 />
               </div>
-
+              
               <button
                 type="submit"
                 disabled={@inference_check_busy}
@@ -1592,14 +1594,14 @@ defmodule CompanionWeb.StatusLive do
                 {if @inference_check_busy, do: "Refreshing…", else: "Refresh models"}
               </button>
             </form>
-
+            
             <div :if={@inference_check_result != nil} class="mt-4 text-[11px] font-mono space-y-1">
               <%= case @inference_check_result do %>
                 <% {:ok, meta} -> %>
                   <p class="telvm-text-ok font-medium">OK — models listed.</p>
-
+                  
                   <p style="color: var(--telvm-shell-muted);">Count: {meta.model_count}</p>
-
+                  
                   <p
                     :if={meta.sample_ids != []}
                     class="break-all"
@@ -1612,7 +1614,7 @@ defmodule CompanionWeb.StatusLive do
               <% end %>
             </div>
           </section>
-
+          
           <aside
             class="min-w-0 rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4"
             id="agent-goose-panel"
@@ -1620,25 +1622,30 @@ defmodule CompanionWeb.StatusLive do
             <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] mb-2 font-semibold">
               Agent runtime · diagnostics
             </div>
+            
             <p class="text-[10px] mb-3" style="color: var(--telvm-shell-muted);">
               Optional: container state and log tail for operators. The Model / Goose chat panel is on the right on wide screens; use a full TTY for
               <span class="font-mono">goose session</span>
               when you need the interactive REPL.
             </p>
+            
             <div class="text-[11px] font-mono space-y-1 mb-3">
               <p>
-                <span class="telvm-accent-dim-text text-[10px] uppercase mr-1">container</span>
-                {goose_panel_container_display(@goose_container_id)}
+                <span class="telvm-accent-dim-text text-[10px] uppercase mr-1">container</span> {goose_panel_container_display(
+                  @goose_container_id
+                )}
               </p>
+              
               <p>
-                <span class="telvm-accent-dim-text text-[10px] uppercase mr-1">state</span>
-                {@goose_status || "—"}
+                <span class="telvm-accent-dim-text text-[10px] uppercase mr-1">state</span> {@goose_status ||
+                  "—"}
               </p>
             </div>
+            
             <p class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] mb-1 font-semibold">
               Exec (from repo root)
             </p>
-            <pre
+             <pre
               class="text-[10px] font-mono whitespace-pre-wrap break-all p-2 rounded border mb-3"
               style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-input-bg) 88%, black); color: var(--telvm-shell-fg);"
             >docker compose exec -it goose goose session</pre>
@@ -1666,9 +1673,11 @@ defmodule CompanionWeb.StatusLive do
                 Restart
               </button>
             </div>
+            
             <div class="text-[10px] mb-1 telvm-accent-dim-text uppercase tracking-wide">
               Engine logs (tail)
             </div>
+            
             <code
               :if={@goose_logs_loading}
               class="block text-[10px] font-mono"
@@ -1681,14 +1690,13 @@ defmodule CompanionWeb.StatusLive do
               class="block text-[10px] font-mono text-red-400/90 whitespace-pre-wrap"
             >
               {@goose_logs_error}
-            </code>
-            <pre
+            </code> <pre
               :if={!@goose_logs_loading && !@goose_logs_error}
               class="max-h-48 overflow-y-auto rounded border p-2 text-[10px] font-mono whitespace-pre-wrap break-words"
               style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-input-bg) 92%, black); color: var(--telvm-shell-fg);"
             >{@goose_logs_text || ""}</pre>
           </aside>
-
+          
           <aside
             class="min-w-0 rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4"
             id="agent-retardeel-panel"
@@ -1696,11 +1704,13 @@ defmodule CompanionWeb.StatusLive do
             <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] mb-2 font-semibold">
               retardeel · filesystem agent verifier
             </div>
+            
             <p class="text-[10px] mb-3" style="color: var(--telvm-shell-muted);">
               Builds the retardeel Zig binary via Docker, injects it into the sandbox container
               (<span class="font-mono telvm-accent-dim-text">telvm.sandbox=true</span>),
               and runs endpoint checks: health, workspace, stat, read, write, list, jail escape, auth.
             </p>
+            
             <div class="flex flex-wrap gap-2 mb-3">
               <button
                 type="button"
@@ -1717,22 +1727,20 @@ defmodule CompanionWeb.StatusLive do
                 {if @retardeel_verify_status == :running, do: "Verifying…", else: "Verify retardeel"}
               </button>
             </div>
-
+            
             <div
               :if={@retardeel_verify_status == :running && @retardeel_verify_results == nil}
               class="text-[10px] font-mono telvm-accent-dim-text animate-pulse"
             >
               Building image, injecting binary, running checks…
             </div>
-
+            
             <div :if={is_list(@retardeel_verify_results)} class="space-y-1">
               <div
                 :for={{name, status, detail} <- @retardeel_verify_results}
                 class="flex items-baseline gap-2 text-[10px] font-mono"
               >
-                <span class={retardeel_status_class(status)}>
-                  {retardeel_status_tag(status)}
-                </span>
+                <span class={retardeel_status_class(status)}>{retardeel_status_tag(status)}</span>
                 <span style="color: var(--telvm-shell-fg);">{name}</span>
                 <span
                   class="truncate max-w-[14rem]"
@@ -1742,23 +1750,24 @@ defmodule CompanionWeb.StatusLive do
                   {detail}
                 </span>
               </div>
-
-              <div class="mt-2 pt-2 border-t text-[10px] font-mono" style="border-color: var(--telvm-shell-border);">
+              
+              <div
+                class="mt-2 pt-2 border-t text-[10px] font-mono"
+                style="border-color: var(--telvm-shell-border);"
+              >
                 <span class="telvm-text-ok">
                   {Enum.count(@retardeel_verify_results, fn {_, s, _} -> s == :pass end)} PASS
-                </span>
-                <span class="mx-1" style="color: var(--telvm-shell-muted);">·</span>
+                </span> <span class="mx-1" style="color: var(--telvm-shell-muted);">·</span>
                 <span class="telvm-text-danger-ink">
                   {Enum.count(@retardeel_verify_results, fn {_, s, _} -> s == :fail end)} FAIL
-                </span>
-                <span class="mx-1" style="color: var(--telvm-shell-muted);">·</span>
+                </span> <span class="mx-1" style="color: var(--telvm-shell-muted);">·</span>
                 <span style="color: var(--telvm-shell-muted);">
                   {Enum.count(@retardeel_verify_results, fn {_, s, _} -> s == :skip end)} SKIP
                 </span>
               </div>
             </div>
           </aside>
-
+          
           <section class="text-[10px] leading-relaxed" style="color: var(--telvm-shell-muted);">
             <span class="telvm-accent-dim-text font-semibold uppercase tracking-[0.12em]">
               Weights
@@ -1768,7 +1777,7 @@ defmodule CompanionWeb.StatusLive do
             Compose service when ready. Not loaded inside the Phoenix app.
           </section>
         </div>
-
+        
         <div class="min-w-0">
           <section
             class="rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4 lg:sticky lg:top-4"
@@ -1778,6 +1787,7 @@ defmodule CompanionWeb.StatusLive do
               <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] font-semibold">
                 Chat
               </div>
+              
               <div
                 class="inline-flex rounded border text-[10px] font-mono overflow-hidden"
                 style="border-color: var(--telvm-shell-border);"
@@ -1805,12 +1815,12 @@ defmodule CompanionWeb.StatusLive do
                 </button>
               </div>
             </div>
-
+            
             <div class={["space-y-3", @agent_chat_tab != :model && "hidden"]}>
               <p class="text-[10px]" style="color: var(--telvm-shell-muted);">
                 Direct OpenAI-style completions. One session at a time — end the session to switch models. Transcript is ephemeral.
               </p>
-
+              
               <div :if={@agent_chat_session == :idle} class="space-y-2">
                 <form phx-submit="start_agent_chat" class="space-y-2">
                   <div :if={@inference_model_ids != []}>
@@ -1829,10 +1839,11 @@ defmodule CompanionWeb.StatusLive do
                       <option value="" disabled selected class="text-zinc-500">
                         — pick after Refresh models —
                       </option>
+                      
                       <option :for={id <- @inference_model_ids} value={id}>{id}</option>
                     </select>
                   </div>
-
+                  
                   <div :if={@inference_model_ids == []}>
                     <label
                       for="agent-chat-model-text"
@@ -1854,14 +1865,14 @@ defmodule CompanionWeb.StatusLive do
                       to fill the list, or type a model id from your server.
                     </p>
                   </div>
-
+                  
                   <p
                     :if={@agent_chat_error != nil && @agent_chat_session == :idle}
                     class="text-[11px] telvm-text-danger-ink"
                   >
                     {@agent_chat_error}
                   </p>
-
+                  
                   <button
                     type="submit"
                     class="px-3 py-2 text-[10px] sm:text-xs font-mono font-semibold rounded-md border uppercase tracking-wide telvm-btn-secondary"
@@ -1870,13 +1881,13 @@ defmodule CompanionWeb.StatusLive do
                   </button>
                 </form>
               </div>
-
+              
               <div :if={@agent_chat_session == :active} class="space-y-2">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <p class="text-[11px] font-mono" style="color: var(--telvm-shell-fg);">
-                    <span class="telvm-accent-dim-text text-[10px] uppercase mr-1">model</span>
-                    {@agent_chat_model}
+                    <span class="telvm-accent-dim-text text-[10px] uppercase mr-1">model</span> {@agent_chat_model}
                   </p>
+                  
                   <button
                     type="button"
                     phx-click="end_agent_chat"
@@ -1885,26 +1896,24 @@ defmodule CompanionWeb.StatusLive do
                     End session
                   </button>
                 </div>
-
-                <pre
+                 <pre
                   class="max-h-48 overflow-y-auto rounded border p-2 text-[11px] font-mono whitespace-pre-wrap break-words"
                   style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-input-bg) 92%, black); color: var(--telvm-shell-fg);"
                 ><%= agent_chat_transcript(@agent_chat_messages) %></pre>
-
                 <div
                   :if={@agent_chat_busy}
                   class="text-[10px] telvm-accent-dim-text animate-pulse"
                 >
                   Model is replying…
                 </div>
-
+                
                 <p
                   :if={@agent_chat_error != nil}
                   class="text-[11px] telvm-text-danger-ink whitespace-pre-wrap"
                 >
                   {@agent_chat_error}
                 </p>
-
+                
                 <form phx-submit="send_agent_chat" class="space-y-2">
                   <textarea
                     name="content"
@@ -1928,11 +1937,12 @@ defmodule CompanionWeb.StatusLive do
                 </form>
               </div>
             </div>
-
+            
             <div class={["space-y-3", @agent_chat_tab != :goose && "hidden"]} id="agent-goose-chat">
               <p class="text-[10px]" style="color: var(--telvm-shell-muted);">
                 Messages go to the Goose process in your stack (configured with Ollama). Streaming may arrive later; for now each send runs one agent turn.
               </p>
+              
               <p
                 id="agent-goose-health-line"
                 class="text-[9px] font-mono leading-snug rounded border px-2 py-1.5"
@@ -1940,7 +1950,7 @@ defmodule CompanionWeb.StatusLive do
               >
                 {goose_health_line(@goose_health_snapshot)}
               </p>
-
+              
               <div
                 class="space-y-2 min-h-[10rem] max-h-[min(50vh,22rem)] overflow-y-auto rounded border p-3 text-[11px] font-mono leading-relaxed"
                 style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-input-bg) 94%, black);"
@@ -1952,24 +1962,27 @@ defmodule CompanionWeb.StatusLive do
                 >
                   Say hello — you should get a reply once Goose is running and configured.
                 </div>
+                
                 <div :for={m <- @goose_chat_messages} class={goose_chat_row_class(m)}>
                   <div class="text-[9px] uppercase tracking-wide mb-0.5 telvm-accent-dim-text">
                     {goose_chat_role_label(m)}
                   </div>
+                  
                   <div class="whitespace-pre-wrap break-words">{m["content"]}</div>
                 </div>
+                
                 <div :if={@goose_chat_busy} class="text-[10px] telvm-accent-dim-text animate-pulse">
                   Goose is thinking…
                 </div>
               </div>
-
+              
               <p
                 :if={@goose_chat_error != nil}
                 class="text-[11px] telvm-text-danger-ink whitespace-pre-wrap"
               >
                 {@goose_chat_error}
               </p>
-
+              
               <div class="flex flex-wrap gap-2">
                 <button
                   :if={@goose_chat_messages != []}
@@ -1980,7 +1993,7 @@ defmodule CompanionWeb.StatusLive do
                   Clear
                 </button>
               </div>
-
+              
               <form phx-submit="send_goose_chat" class="space-y-2">
                 <textarea
                   name="content"
@@ -2103,14 +2116,15 @@ defmodule CompanionWeb.StatusLive do
       <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] mb-2 font-semibold">
         vendor CLI agents
       </div>
+      
       <p class="text-[10px] mb-3 leading-snug max-w-2xl" style="color: var(--telvm-shell-muted);">
         Pull the published image, start the matching Compose service, then run
-        <span class="telvm-accent-dim-text">Basic soak</span> (egress proxy + apt). On success the container is listed on
-        <span class="telvm-accent-dim-text">Warm assets</span>. Promotion is in-memory until companion restarts.
+        <span class="telvm-accent-dim-text">Basic soak</span>
+        (egress proxy + apt). On success the container is listed on <span class="telvm-accent-dim-text">Warm assets</span>. Promotion is in-memory until companion restarts.
         Discovery uses Compose project <span class="font-mono">{compose_project_name()}</span>
         (<code class="text-[9px]">TELVM_COMPOSE_PROJECT</code> to override).
       </p>
-
+      
       <div
         class="flex rounded overflow-hidden text-[10px] mb-3 w-fit"
         style="border: 1px solid var(--telvm-shell-border);"
@@ -2141,7 +2155,7 @@ defmodule CompanionWeb.StatusLive do
           Node + Codex
         </button>
       </div>
-
+      
       <div
         :if={@other_agents_verify_error}
         class="mb-3 text-[11px] font-mono telvm-text-danger-ink whitespace-pre-wrap"
@@ -2149,24 +2163,28 @@ defmodule CompanionWeb.StatusLive do
       >
         {@other_agents_verify_error}
       </div>
-
+      
       <div :for={row <- @other_agents_rows} :if={row.entry.tab_key == @closed_agents_tab}>
         <div class="rounded border p-3 max-w-3xl" style="border-color: var(--telvm-shell-border);">
           <div class="text-sm font-semibold mb-1" style="color: var(--telvm-shell-fg);">
             {row.entry.card_title}
           </div>
-          <p class="text-[10px] font-mono mb-2 telvm-accent-dim-text">
-            {row.entry.stack_line}
-          </p>
+          
+          <p class="text-[10px] font-mono mb-2 telvm-accent-dim-text">{row.entry.stack_line}</p>
+          
           <div
             class="rounded border p-2 mb-3 font-mono text-[10px] leading-relaxed whitespace-pre-wrap overflow-x-auto"
             style="border-color: color-mix(in oklch, var(--telvm-shell-border) 85%, transparent); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
           >
             {row.entry.stack_disclosure}
           </div>
+          
           <div class="text-[10px] font-mono mb-2 break-all" style="color: var(--telvm-shell-muted);">
-            <span class="telvm-accent-dim-text">image</span> {ClosedAgentsCatalog.ghcr_main_ref(row.entry)}
+            <span class="telvm-accent-dim-text">image</span> {ClosedAgentsCatalog.ghcr_main_ref(
+              row.entry
+            )}
           </div>
+          
           <div class="flex flex-wrap gap-2 mb-3">
             <button
               type="button"
@@ -2178,15 +2196,16 @@ defmodule CompanionWeb.StatusLive do
               {if @image_pull_busy, do: "…", else: "pull image"}
             </button>
           </div>
+          
           <div class="flex flex-wrap items-center gap-2 mb-2 text-[10px] font-mono">
             <span class={if(row.running, do: "telvm-text-ok", else: "telvm-text-warn")}>
               {if row.running, do: "running", else: "not running"}
-            </span>
-            <span :if={row.in_warm_registry} class="telvm-text-ok">on warm assets</span>
+            </span> <span :if={row.in_warm_registry} class="telvm-text-ok">on warm assets</span>
             <span class="telvm-accent-dim-text">
               compose · {row.entry.compose_service} · proxy companion:{row.entry.proxy_port}
             </span>
           </div>
+          
           <div
             :if={row.egress_workload}
             class="text-[10px] font-mono mb-2 break-all leading-snug"
@@ -2196,30 +2215,35 @@ defmodule CompanionWeb.StatusLive do
             <span> · </span>
             <span class="telvm-accent-dim-text">allowlist</span> {row.egress_workload.allow_digest}
           </div>
+          
           <div
             :if={!row.egress_workload && @egress_proxy_snapshot.enabled}
             class="text-[10px] font-mono mb-2 telvm-text-warn"
             style="color: var(--telvm-shell-muted);"
           >
-            no egress workload in companion config for companion:{row.entry.proxy_port} — check
-            <code class="telvm-accent-dim-text">TELVM_EGRESS_WORKLOADS</code>.
+            no egress workload in companion config for companion:{row.entry.proxy_port} — check <code class="telvm-accent-dim-text">TELVM_EGRESS_WORKLOADS</code>.
           </div>
+          
           <div
-            :if={!row.egress_workload && !@egress_proxy_snapshot.enabled && @egress_proxy_snapshot.workloads != []}
+            :if={
+              !row.egress_workload && !@egress_proxy_snapshot.enabled &&
+                @egress_proxy_snapshot.workloads != []
+            }
             class="text-[10px] font-mono mb-2"
             style="color: var(--telvm-shell-muted);"
           >
             <span class="telvm-accent-dim-text">egress workloads configured but proxy disabled</span>
-            — enable
-            <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code>
+            — enable <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code>
             (<.link patch={~p"/health"} class="underline telvm-accent-dim-text">Pre-flight</.link>).
           </div>
+          
           <div class="text-[10px] font-mono mb-2" style="color: var(--telvm-shell-muted);">
             <span :if={row.container_id}>id {String.slice(row.container_id, 0, 12)}…</span>
             <span :if={!row.container_id}>
               no container for this service in Compose project {compose_project_name()}
             </span>
           </div>
+          
           <button
             type="button"
             phx-click="verify_closed_agent"
@@ -2228,9 +2252,10 @@ defmodule CompanionWeb.StatusLive do
             disabled={not row.running or @other_agents_verify_busy}
             class="px-2 py-0.5 text-[10px] rounded-sm border uppercase tracking-wide telvm-btn-primary disabled:opacity-40"
           >
-            {if @other_agents_verify_busy && @other_agents_verify_service == row.entry.compose_service,
-              do: "soaking…",
-              else: "Basic soak"}
+            {if @other_agents_verify_busy &&
+                  @other_agents_verify_service == row.entry.compose_service,
+                do: "soaking…",
+                else: "Basic soak"}
           </button>
         </div>
       </div>
@@ -2253,34 +2278,173 @@ defmodule CompanionWeb.StatusLive do
           telvm · morayeel
         </div>
       </div>
-
+      
       <p
         class="telvm-prose-bar text-[11px] mb-5 font-mono leading-relaxed max-w-2xl border-l-2 pl-2"
         style="color: var(--telvm-shell-muted);"
       >
-        Headless Chromium (Playwright) runs inside Docker on
-        <span class="telvm-accent-dim-text font-mono">telvm_default</span>.
-        The container sets <span class="telvm-accent-dim-text font-mono">HTTP_PROXY=http://companion:4003</span>
-        (egress workload <span class="telvm-accent-dim-text">morayeel</span>, allowlist
-        <span class="font-mono telvm-accent-dim-text">morayeel_lab</span>) while
-        <span class="font-mono telvm-accent-dim-text">NO_PROXY</span> includes
-        <span class="font-mono telvm-accent-dim-text">morayeel_lab</span> so the first-party lab is reached
-        <span class="telvm-accent-dim-text">directly</span> on the compose network (Chromium reliably persists
-        <span class="font-mono telvm-accent-dim-text">Set-Cookie</span> into
-        <span class="font-mono telvm-accent-dim-text">storageState.json</span>). Writes
-        <span class="font-mono telvm-accent-dim-text">storageState.json</span>,
-        <span class="font-mono telvm-accent-dim-text">network.har</span>, and
-        <span class="font-mono telvm-accent-dim-text">run.json</span> on the shared volume under
-        <span class="font-mono telvm-accent-dim-text">morayeel_runs/</span> (one directory per run id).
+        Headless Chromium (Playwright) runs inside Docker on <span class="telvm-accent-dim-text font-mono">telvm_default</span>.
+        The container sets
+        <span class="telvm-accent-dim-text font-mono">HTTP_PROXY=http://companion:4003</span>
+        (egress workload <span class="telvm-accent-dim-text">morayeel</span>, allowlist <span class="font-mono telvm-accent-dim-text">morayeel_lab</span>) while
+        <span class="font-mono telvm-accent-dim-text">NO_PROXY</span>
+        includes <span class="font-mono telvm-accent-dim-text">morayeel_lab</span>
+        so the first-party lab is reached <span class="telvm-accent-dim-text">directly</span>
+        on the compose network (Chromium reliably persists
+        <span class="font-mono telvm-accent-dim-text">Set-Cookie</span>
+        into <span class="font-mono telvm-accent-dim-text">storageState.json</span>). Writes <span class="font-mono telvm-accent-dim-text">storageState.json</span>, <span class="font-mono telvm-accent-dim-text">network.har</span>, and
+        <span class="font-mono telvm-accent-dim-text">run.json</span>
+        on the shared volume under <span class="font-mono telvm-accent-dim-text">morayeel_runs/</span>
+        (one directory per run id).
         See <span class="font-mono telvm-accent-dim-text">docs/morayeel-verification.md</span>.
+        Artifacts always include <span class="font-mono telvm-accent-dim-text">storageState.json</span>, <span class="font-mono telvm-accent-dim-text">network.har</span>, and <span class="font-mono telvm-accent-dim-text">run.json</span>; the HAR is complete after the run finishes
+        (<span class="font-mono telvm-accent-dim-text">context.close()</span> in Playwright).
       </p>
-
+      
+      <section class="rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4 mb-4 space-y-3">
+        <h2 class="text-[11px] sm:text-xs uppercase tracking-[0.15em] font-semibold telvm-accent-text mb-2">
+          Operator runbook
+        </h2>
+        
+        <p
+          class="text-[11px] font-mono leading-relaxed telvm-muted-xs mb-3"
+          style="color: var(--telvm-shell-muted);"
+        >
+          The button below runs <span class="telvm-accent-dim-text">headless</span>
+          Playwright <span class="telvm-accent-dim-text">inside Docker</span>
+          only.
+          Headed runs happen on your laptop using the same <span class="font-mono telvm-accent-dim-text">run.mjs</span>; this section is the copy-paste guide.
+        </p>
+        
+        <details class="group mb-2 rounded-sm border telvm-panel-border telvm-panel-bg open:pb-2">
+          <summary class="cursor-pointer select-none px-2 py-1.5 text-[11px] font-mono telvm-accent-dim-text hover:opacity-90">
+            Container vs local (what differs)
+          </summary>
+          
+          <div class="px-2 pb-2 overflow-x-auto">
+            <table
+              class="w-full text-left text-[10px] font-mono border-collapse mt-1"
+              style="color: var(--telvm-shell-muted);"
+            >
+              <thead>
+                <tr class="border-b" style="border-color: var(--telvm-shell-border);">
+                  <th class="py-1 pr-2 font-semibold telvm-accent-dim-text">Aspect</th>
+                  
+                  <th class="py-1 pr-2 font-semibold telvm-accent-dim-text">In Docker (default)</th>
+                  
+                  <th class="py-1 font-semibold telvm-accent-dim-text">On your machine</th>
+                </tr>
+              </thead>
+              
+              <tbody>
+                <tr
+                  :for={row <- @morayeel_operator_guide.comparison_rows}
+                  class="border-b align-top"
+                  style="border-color: var(--telvm-shell-border);"
+                >
+                  <td class="py-1.5 pr-2 font-semibold text-[var(--telvm-shell-fg)]">{row.topic}</td>
+                  
+                  <td class="py-1.5 pr-2">{row.in_docker}</td>
+                  
+                  <td class="py-1.5">{row.locally}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+        
+        <details class="group mb-2 rounded-sm border telvm-panel-border telvm-panel-bg open:pb-2">
+          <summary class="cursor-pointer select-none px-2 py-1.5 text-[11px] font-mono telvm-accent-dim-text hover:opacity-90">
+            Path 1 — Headless in Docker (same as LiveView button)
+          </summary>
+          
+          <div class="px-2 pb-2 space-y-2">
+            <pre
+              class="p-2 text-[10px] font-mono rounded-sm overflow-x-auto whitespace-pre"
+              style="border: 1px solid var(--telvm-shell-border); background: var(--telvm-input-bg);"
+            >{@morayeel_operator_guide.docker_smoke_snippet}</pre>
+            <p class="text-[10px] font-mono telvm-muted-xs">
+              {@morayeel_operator_guide.docker_session_hint}
+            </p>
+          </div>
+        </details>
+        
+        <details class="group mb-2 rounded-sm border telvm-panel-border telvm-panel-bg open:pb-2">
+          <summary class="cursor-pointer select-none px-2 py-1.5 text-[11px] font-mono telvm-accent-dim-text hover:opacity-90">
+            Path 2 — Install Playwright (local; all OS)
+          </summary>
+          
+          <div class="px-2 pb-2 space-y-3">
+            <p class="text-[10px] font-mono telvm-muted-xs">
+              Install
+              <a
+                href={@morayeel_operator_guide.playwright_intro_url}
+                class="underline telvm-accent-dim-text"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Playwright system dependencies
+              </a>
+              from upstream when browsers fail to launch.
+            </p>
+            
+            <div :for={block <- @morayeel_operator_guide.install_os_blocks} class="space-y-1">
+              <div class="text-[10px] font-semibold telvm-accent-dim-text">{block.os}</div>
+               <pre
+                class="p-2 text-[10px] font-mono rounded-sm overflow-x-auto whitespace-pre"
+                style="border: 1px solid var(--telvm-shell-border); background: var(--telvm-input-bg);"
+              >{Enum.join(block.lines, "\n")}</pre>
+            </div>
+          </div>
+        </details>
+        
+        <details class="group mb-2 rounded-sm border telvm-panel-border telvm-panel-bg open:pb-2">
+          <summary class="cursor-pointer select-none px-2 py-1.5 text-[11px] font-mono telvm-accent-dim-text hover:opacity-90">
+            Path 2 — Run locally (headless vs headed)
+          </summary>
+          
+          <div class="px-2 pb-2 space-y-2">
+            <div class="text-[10px] font-semibold telvm-accent-dim-text">Headless</div>
+             <pre
+              class="p-2 text-[10px] font-mono rounded-sm overflow-x-auto whitespace-pre"
+              style="border: 1px solid var(--telvm-shell-border); background: var(--telvm-input-bg);"
+            >{@morayeel_operator_guide.local_headless_snippet}</pre>
+            <div class="text-[10px] font-semibold telvm-accent-dim-text">Headed (visible window)</div>
+             <pre
+              class="p-2 text-[10px] font-mono rounded-sm overflow-x-auto whitespace-pre"
+              style="border: 1px solid var(--telvm-shell-border); background: var(--telvm-input-bg);"
+            >{@morayeel_operator_guide.local_headed_snippet}</pre>
+            <p class="text-[10px] font-mono telvm-muted-xs">
+              Or set <span class="font-mono">MORAYEEL_HEADLESS=0</span>
+              and run <span class="font-mono">node run.mjs</span>.
+              Full env reference: <span class="font-mono">{@morayeel_operator_guide.readme_path}</span>.
+            </p>
+          </div>
+        </details>
+        
+        <details class="group rounded-sm border telvm-panel-border telvm-panel-bg open:pb-2">
+          <summary class="cursor-pointer select-none px-2 py-1.5 text-[11px] font-mono telvm-accent-dim-text hover:opacity-90">
+            When to use headed vs session (CDP)
+          </summary>
+          
+          <div
+            class="px-2 pb-2 space-y-2 text-[10px] font-mono leading-relaxed telvm-muted-xs"
+            style="color: var(--telvm-shell-muted);"
+          >
+            <p>{@morayeel_operator_guide.when_to_use}</p>
+            
+            <p>
+              Repo docs: <span class="font-mono telvm-accent-dim-text">{@morayeel_operator_guide.additions_doc}</span>, <span class="font-mono telvm-accent-dim-text">{@morayeel_operator_guide.verification_doc}</span>.
+            </p>
+          </div>
+        </details>
+      </section>
+      
       <section class="rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4 mb-4 space-y-3">
         <div class="flex flex-wrap items-center gap-2">
           <span class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] font-semibold">
             status
-          </span>
-          <span class="font-mono text-xs">{inspect(@morayeel.status)}</span>
+          </span> <span class="font-mono text-xs">{inspect(@morayeel.status)}</span>
           <span :if={@morayeel[:run_id]} class="telvm-muted-xs font-mono">
             run {@morayeel[:run_id]}
           </span>
@@ -2288,7 +2452,7 @@ defmodule CompanionWeb.StatusLive do
             exit {@morayeel[:exit_code]}
           </span>
         </div>
-
+        
         <div class="flex flex-wrap gap-2">
           <button
             type="button"
@@ -2303,17 +2467,20 @@ defmodule CompanionWeb.StatusLive do
             {if @morayeel.status == :running, do: "Running…", else: "Run headless lab"}
           </button>
         </div>
-
+        
         <div :if={is_map(@morayeel[:summary])} class="text-[11px] font-mono space-y-1 telvm-muted-xs">
           <div>
-            cookies: {Map.get(@morayeel[:summary], :cookie_count, 0)} —
-            {Enum.join(Map.get(@morayeel[:summary], :cookie_names, []), ", ")}
+            cookies: {Map.get(@morayeel[:summary], :cookie_count, 0)} — {Enum.join(
+              Map.get(@morayeel[:summary], :cookie_names, []),
+              ", "
+            )}
           </div>
+          
           <div :if={Map.get(@morayeel[:summary], :origins, []) != []}>
             domains: {Enum.join(Map.get(@morayeel[:summary], :origins, []), ", ")}
           </div>
         </div>
-
+        
         <div :if={@morayeel_artifact_rid} class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-mono">
           <a
             class="underline telvm-accent-dim-text"
@@ -2340,12 +2507,12 @@ defmodule CompanionWeb.StatusLive do
             runner.log
           </a>
         </div>
-
+        
         <div :if={@morayeel[:docker_log] != "" && @morayeel[:docker_log]} class="space-y-1">
           <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] font-semibold">
             docker log (tail)
           </div>
-          <pre
+           <pre
             class="h-48 overflow-auto p-2 text-[10px] font-mono rounded-sm whitespace-pre-wrap break-all"
             style="border: 1px solid var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-muted);"
           >{@morayeel[:docker_log]}</pre>
@@ -2373,7 +2540,7 @@ defmodule CompanionWeb.StatusLive do
         <div class="text-[11px] sm:text-xs uppercase tracking-[0.2em] telvm-accent-text font-semibold shrink-0">
           telvm · warm assets
         </div>
-
+        
         <p
           class="text-[9px] sm:text-[10px] font-mono leading-snug max-w-md lg:max-w-xl lg:text-right"
           style="color: var(--telvm-shell-muted);"
@@ -2385,7 +2552,7 @@ defmodule CompanionWeb.StatusLive do
           ). Pull + soak from Vendor CLI agents on Machines.
         </p>
       </div>
-
+      
       <div class="lg:grid lg:grid-cols-12 lg:items-start lg:gap-5 flex flex-col gap-4">
         <div class="lg:col-span-5 min-w-0 order-1">
           <.warm_machines_section
@@ -2393,12 +2560,12 @@ defmodule CompanionWeb.StatusLive do
             scroll_class="max-h-[min(52vh,22rem)] lg:max-h-[min(82vh,44rem)] overflow-y-auto pr-1"
           />
         </div>
-
+        
         <div class="lg:col-span-7 min-w-0 order-2 flex flex-col">
           <.warm_preview_panel {assigns} />
         </div>
       </div>
-
+      
       <section
         class="mt-6 pt-4 telvm-accent-border-b border-t border-dashed"
         aria-labelledby="warm-network-blueprint-heading"
@@ -2409,11 +2576,11 @@ defmodule CompanionWeb.StatusLive do
         >
           Network blueprint
         </h2>
-
+        
         <p class="text-[9px] font-mono mb-3" style="color: var(--telvm-shell-muted);">
           Live snapshot: Compose stack + warm rows (labs and verified closed agents). Refreshes with the warm list.
         </p>
-        <pre
+         <pre
           class="telvm-panel-bg telvm-panel-border border rounded-sm p-3 w-full text-[10px] sm:text-[11px] font-mono whitespace-pre overflow-x-auto"
           aria-label="Network blueprint: Compose stack, Docker bridge, and warm lab containers"
         ><%= @warm_network_blueprint %></pre>
@@ -2433,7 +2600,7 @@ defmodule CompanionWeb.StatusLive do
       <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.15em] mb-3 font-semibold">
         warm assets
       </div>
-
+      
       <div
         :if={@warm_machines == []}
         class="text-[11px] font-mono italic"
@@ -2441,7 +2608,7 @@ defmodule CompanionWeb.StatusLive do
       >
         No warm rows — verify a lab on Machines, or run Basic soak for a vendor CLI agent under Machines (Compose must be running).
       </div>
-
+      
       <div :if={@warm_machines != []} class={["space-y-3", @scroll_class]}>
         <div
           :for={m <- @warm_machines}
@@ -2460,7 +2627,7 @@ defmodule CompanionWeb.StatusLive do
               >
                 {m.name}
               </div>
-
+              
               <div
                 class="text-[10px] truncate font-mono mt-0.5"
                 style="color: var(--telvm-shell-muted);"
@@ -2469,7 +2636,7 @@ defmodule CompanionWeb.StatusLive do
                 {m.image}
               </div>
             </div>
-
+            
             <div class="flex items-center gap-2 shrink-0">
               <span
                 :if={Map.get(m, :kind, :lab) != :closed_agent}
@@ -2519,7 +2686,7 @@ defmodule CompanionWeb.StatusLive do
                   pause
                 </button>
               </div>
-
+              
               <div
                 :if={Map.get(m, :kind, :lab) != :closed_agent && warm_machine_paused?(m)}
                 class="flex flex-wrap items-center gap-1"
@@ -2543,7 +2710,7 @@ defmodule CompanionWeb.StatusLive do
                   destroy
                 </button>
               </div>
-
+              
               <div
                 :if={Map.get(m, :kind, :lab) != :closed_agent && warm_machine_destroy_only?(m)}
                 class="flex flex-wrap items-center gap-1"
@@ -2560,7 +2727,7 @@ defmodule CompanionWeb.StatusLive do
               </div>
             </div>
           </div>
-
+          
           <div
             class="border-t pt-2 mt-1"
             style="border-color: color-mix(in oklch, var(--telvm-shell-border) 85%, transparent);"
@@ -2568,7 +2735,7 @@ defmodule CompanionWeb.StatusLive do
             <div class="telvm-accent-text text-[10px] uppercase tracking-[0.12em] font-semibold mb-2">
               endpoints
             </div>
-
+            
             <div class="flex flex-col gap-2">
               <div
                 :if={Map.get(m, :kind, :lab) == :closed_agent && Map.get(m, :egress_internal_url)}
@@ -2577,33 +2744,48 @@ defmodule CompanionWeb.StatusLive do
                 <div class="text-[10px] uppercase tracking-[0.12em] font-semibold telvm-accent-dim-text">
                   Egress
                 </div>
+                
                 <div
                   :if={Map.get(m, :egress_workload_id)}
                   class="text-[10px] font-mono space-y-1"
                   style="color: var(--telvm-shell-fg);"
                 >
                   <div class="break-all">
-                    <span class="telvm-accent-dim-text">workload</span> {Map.get(m, :egress_workload_id)}
-                    <span style="color: var(--telvm-shell-muted);"> · </span>
-                    <span class="telvm-accent-dim-text">listener</span>
-                    {Map.get(m, :egress_internal_url)}
+                    <span class="telvm-accent-dim-text">workload</span> {Map.get(
+                      m,
+                      :egress_workload_id
+                    )} <span style="color: var(--telvm-shell-muted);"> · </span>
+                    <span class="telvm-accent-dim-text">listener</span> {Map.get(
+                      m,
+                      :egress_internal_url
+                    )}
                   </div>
+                  
                   <div :if={Map.get(m, :egress_allow_digest)} class="break-all">
-                    <span class="telvm-accent-dim-text">allowlist</span> {Map.get(m, :egress_allow_digest)}
+                    <span class="telvm-accent-dim-text">allowlist</span> {Map.get(
+                      m,
+                      :egress_allow_digest
+                    )}
                   </div>
+                  
                   <p class="text-[9px] leading-snug" style="color: var(--telvm-shell-muted);">
                     <code class="telvm-accent-dim-text">HTTP(S)_PROXY</code>
-                    points here; HTTPS is
-                    <code class="telvm-accent-dim-text">CONNECT</code>
+                    points here; HTTPS is <code class="telvm-accent-dim-text">CONNECT</code>
                     + allowlist in companion (
-                    <.link patch={~p"/health"} class="underline telvm-accent-dim-text">Pre-flight</.link>
+                    <.link patch={~p"/health"} class="underline telvm-accent-dim-text">
+                      Pre-flight
+                    </.link>
                     for denies).
                   </p>
-                  <div :if={Map.get(m, :compose_service) && Map.get(m, :vendor_url)} class="space-y-0.5">
+                  
+                  <div
+                    :if={Map.get(m, :compose_service) && Map.get(m, :vendor_url)}
+                    class="space-y-0.5"
+                  >
                     <div class="text-[9px] uppercase tracking-wide telvm-accent-dim-text">
                       Re-verify (repo root, Compose up)
                     </div>
-                    <pre
+                     <pre
                       class="text-[9px] font-mono leading-snug p-2 rounded border overflow-x-auto select-all whitespace-pre-wrap"
                       style="border-color: var(--telvm-shell-border); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
                       title="Expect proxy_ok on stdout; docker exit code 0 means the probe succeeded."
@@ -2612,18 +2794,16 @@ defmodule CompanionWeb.StatusLive do
                       <code class="telvm-accent-dim-text">curl -sS -o /dev/null</code>
                       prints nothing by design; this command then prints
                       <code class="telvm-accent-dim-text">proxy_ok</code>
-                      or
-                      <code class="telvm-accent-dim-text">proxy_fail</code>
+                      or <code class="telvm-accent-dim-text">proxy_fail</code>
                       . Same HTTPS path as Basic soak. PowerShell: you can also run
                       <code class="telvm-accent-dim-text">echo $LASTEXITCODE</code>
-                      after any compose exec (expect
-                      <code class="telvm-accent-dim-text">0</code>
-                      ). CONNECT-only:
-                      <code class="telvm-accent-dim-text">dirteel egress-probe</code>
+                      after any compose exec (expect <code class="telvm-accent-dim-text">0</code>
+                      ). CONNECT-only: <code class="telvm-accent-dim-text">dirteel egress-probe</code>
                       with the same proxy and vendor URL when dirteel is installed.
                     </p>
                   </div>
                 </div>
+                
                 <div
                   :if={
                     Map.get(m, :kind, :lab) == :closed_agent && Map.get(m, :egress_internal_url) &&
@@ -2632,10 +2812,14 @@ defmodule CompanionWeb.StatusLive do
                   class="text-[10px] font-mono telvm-accent-dim-text break-all"
                 >
                   listener {Map.get(m, :egress_internal_url)}
-                  <span class="block text-[9px] mt-1 telvm-text-warn" style="color: var(--telvm-shell-muted);">
+                  <span
+                    class="block text-[9px] mt-1 telvm-text-warn"
+                    style="color: var(--telvm-shell-muted);"
+                  >
                     no matching egress workload for this port in companion config.
                   </span>
                 </div>
+                
                 <div
                   :if={
                     Map.get(m, :kind, :lab) == :closed_agent && !@egress_proxy_snapshot.enabled &&
@@ -2645,10 +2829,14 @@ defmodule CompanionWeb.StatusLive do
                   style="color: var(--telvm-shell-muted);"
                 >
                   <span class="telvm-accent-dim-text">egress proxy configured but disabled</span>
-                  — set <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code> and restart companion (
-                  <.link patch={~p"/health"} class="underline telvm-accent-dim-text">Pre-flight</.link>
+                  — set <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code>
+                  and restart companion (
+                  <.link patch={~p"/health"} class="underline telvm-accent-dim-text">
+                    Pre-flight
+                  </.link>
                   ).
                 </div>
+                
                 <div
                   :if={
                     Map.get(m, :kind, :lab) == :closed_agent && !@egress_proxy_snapshot.enabled &&
@@ -2662,64 +2850,68 @@ defmodule CompanionWeb.StatusLive do
                   </span>
                 </div>
               </div>
+              
               <div class="flex flex-wrap items-center gap-2">
-              <span
-                :if={Map.get(m, :kind, :lab) != :closed_agent && m.ports == [] and m.internal_ports == []}
-                class="text-xs"
-                style="color: var(--telvm-shell-muted);"
-              >
-                —
-              </span>
-              <button
-                :for={p <- m.ports}
-                type="button"
-                phx-click="preview_port"
-                phx-value-path={"/app/#{m.name}/port/#{p}/"}
-                class={[
-                  "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-mono transition-colors",
-                  port_preview_active?(@preview_mode, @preview_iframe_src, m, p) &&
-                    "telvm-port-btn-on",
-                  !port_preview_active?(@preview_mode, @preview_iframe_src, m, p) &&
-                    "telvm-port-btn-off"
-                ]}
-              >
-                :{p}
-              </button>
-              <span
-                :for={p <- m.internal_ports}
-                class="inline-flex items-center px-2 py-1 rounded-md border text-[10px] font-mono cursor-default"
-                style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-shell-elevated) 80%, transparent); color: var(--telvm-shell-muted);"
-                title={"Internal (#{p})"}
-              >
-                int:{p}
-              </span>
-              <button
-                type="button"
-                phx-click="show_warm_logs"
-                phx-value-id={m.id}
-                class={[
-                  "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-mono transition-colors",
-                  logs_preview_active?(@warm_preview_panel, @warm_logs_container_id, m.id) &&
-                    "telvm-files-btn-on",
-                  !logs_preview_active?(@warm_preview_panel, @warm_logs_container_id, m.id) &&
-                    "telvm-files-btn-off"
-                ]}
-              >
-                <.icon name="hero-command-line" class="size-3.5" /> logs
-              </button>
-              <button
-                type="button"
-                phx-click="set_explorer_preview"
-                phx-value-id={m.id}
-                class={[
-                  "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-mono transition-colors",
-                  @explorer_preview_id == m.id && "telvm-files-btn-on",
-                  @explorer_preview_id != m.id && "telvm-files-btn-off"
-                ]}
-              >
-                <.icon name="hero-folder-open" class="size-3.5" /> files
-              </button>
-            </div>
+                <span
+                  :if={
+                    Map.get(m, :kind, :lab) != :closed_agent && m.ports == [] and
+                      m.internal_ports == []
+                  }
+                  class="text-xs"
+                  style="color: var(--telvm-shell-muted);"
+                >
+                  —
+                </span>
+                <button
+                  :for={p <- m.ports}
+                  type="button"
+                  phx-click="preview_port"
+                  phx-value-path={"/app/#{m.name}/port/#{p}/"}
+                  class={[
+                    "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-mono transition-colors",
+                    port_preview_active?(@preview_mode, @preview_iframe_src, m, p) &&
+                      "telvm-port-btn-on",
+                    !port_preview_active?(@preview_mode, @preview_iframe_src, m, p) &&
+                      "telvm-port-btn-off"
+                  ]}
+                >
+                  :{p}
+                </button>
+                <span
+                  :for={p <- m.internal_ports}
+                  class="inline-flex items-center px-2 py-1 rounded-md border text-[10px] font-mono cursor-default"
+                  style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-shell-elevated) 80%, transparent); color: var(--telvm-shell-muted);"
+                  title={"Internal (#{p})"}
+                >
+                  int:{p}
+                </span>
+                <button
+                  type="button"
+                  phx-click="show_warm_logs"
+                  phx-value-id={m.id}
+                  class={[
+                    "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-mono transition-colors",
+                    logs_preview_active?(@warm_preview_panel, @warm_logs_container_id, m.id) &&
+                      "telvm-files-btn-on",
+                    !logs_preview_active?(@warm_preview_panel, @warm_logs_container_id, m.id) &&
+                      "telvm-files-btn-off"
+                  ]}
+                >
+                  <.icon name="hero-command-line" class="size-3.5" /> logs
+                </button>
+                <button
+                  type="button"
+                  phx-click="set_explorer_preview"
+                  phx-value-id={m.id}
+                  class={[
+                    "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-mono transition-colors",
+                    @explorer_preview_id == m.id && "telvm-files-btn-on",
+                    @explorer_preview_id != m.id && "telvm-files-btn-off"
+                  ]}
+                >
+                  <.icon name="hero-folder-open" class="size-3.5" /> files
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2739,7 +2931,7 @@ defmodule CompanionWeb.StatusLive do
           >
             logs
           </div>
-
+          
           <button
             type="button"
             phx-click="refresh_warm_logs"
@@ -2749,7 +2941,7 @@ defmodule CompanionWeb.StatusLive do
             refresh
           </button>
         </div>
-        <pre
+         <pre
           class="telvm-warm-preview-frame w-full flex-1 min-h-[12rem] max-h-[min(82vh,44rem)] overflow-auto rounded border bg-black/50 p-3 whitespace-pre-wrap font-mono text-[11px] leading-relaxed"
           style="border-color: var(--telvm-shell-border); color: var(--telvm-shell-fg);"
         ><code
@@ -2761,7 +2953,7 @@ defmodule CompanionWeb.StatusLive do
             class="block whitespace-pre-wrap"
           >{@warm_logs_text || ""}</code></pre>
       </div>
-
+      
       <div :if={@warm_preview_panel != :logs} class="flex flex-col flex-1 min-h-0">
         <div
           class="text-[10px] uppercase tracking-wide mb-1 font-semibold"
@@ -2769,7 +2961,7 @@ defmodule CompanionWeb.StatusLive do
         >
           preview
         </div>
-
+        
         <iframe
           :if={@preview_iframe_src != nil}
           src={@preview_iframe_src}
@@ -2783,7 +2975,7 @@ defmodule CompanionWeb.StatusLive do
           style="border-color: color-mix(in oklch, var(--telvm-shell-border) 75%, transparent); border-style: dashed;"
         >
           <p class="telvm-accent-text text-xs font-semibold mb-2">No preview yet</p>
-
+          
           <p
             class="text-[11px] max-w-sm leading-relaxed mb-3"
             style="color: var(--telvm-shell-muted);"
@@ -2794,7 +2986,7 @@ defmodule CompanionWeb.StatusLive do
             for stdout/stderr, or <span class="telvm-accent-dim-text font-mono">files</span>
             for the Monaco editor.
           </p>
-
+          
           <p class="text-[10px] font-mono opacity-70" style="color: var(--telvm-shell-muted);">
             The frame stays here so layout matches when a preview is active.
           </p>
@@ -2815,14 +3007,14 @@ defmodule CompanionWeb.StatusLive do
           telvm · mission console
         </div>
       </div>
-
+      
       <p
         class="telvm-prose-bar text-[11px] mb-5 font-mono leading-relaxed max-w-2xl border-l-2 pl-2"
         style="color: var(--telvm-shell-muted);"
       >
         Ephemeral pre-flight or persistent soak → warm asset. Engine via Finch → docker.sock.
       </p>
-      <%!-- Image & runtime (top) --%>
+       <%!-- Image & runtime (top) --%>
       <section
         class="mb-5 rounded-sm telvm-panel-border border telvm-panel-bg p-3 sm:p-4"
         id="lab-image-section"
@@ -2830,7 +3022,7 @@ defmodule CompanionWeb.StatusLive do
         <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.18em] mb-3 font-semibold">
           image &amp; runtime
         </div>
-
+        
         <div
           class="grid gap-3 mb-4 justify-start [grid-template-columns:repeat(auto-fill,minmax(132px,1fr))]"
           id="lab-catalog-grid"
@@ -2872,14 +3064,14 @@ defmodule CompanionWeb.StatusLive do
             </button>
           </div>
         </div>
-
+        
         <p
           :if={@image_pull_busy}
           class="telvm-accent-text text-[10px] font-mono mb-3 animate-pulse opacity-90"
         >
           Pulling image…
         </p>
-
+        
         <section
           :if={@selected_catalog_entry}
           id="lab-stack-disclosure"
@@ -2897,11 +3089,11 @@ defmodule CompanionWeb.StatusLive do
               (local pull not required to read this)
             </span>
           </h3>
-
+          
           <p class="text-[10px] mb-2 leading-snug" style="color: var(--telvm-shell-muted);">
             Key=value lines below are for humans and automation (agents); they summarize what this certified image contains and why it matches common production practice for the language.
           </p>
-
+          
           <div
             class="rounded border p-2 mb-3 font-mono text-[10px] sm:text-[11px] leading-relaxed whitespace-pre-wrap overflow-x-auto"
             style="border-color: color-mix(in oklch, var(--telvm-shell-border) 85%, transparent); background: var(--telvm-input-bg); color: var(--telvm-shell-fg);"
@@ -2910,11 +3102,11 @@ defmodule CompanionWeb.StatusLive do
           >
             {@selected_catalog_entry.stack_disclosure}
           </div>
-
+          
           <h4 class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] font-semibold mb-1.5">
             why this shape (best practice)
           </h4>
-
+          
           <p
             class="text-[11px] sm:text-xs leading-relaxed max-w-prose"
             style="color: var(--telvm-shell-muted);"
@@ -2922,7 +3114,7 @@ defmodule CompanionWeb.StatusLive do
             {@selected_catalog_entry.best_practice}
           </p>
         </section>
-
+        
         <div class="max-w-2xl">
           <label
             for="byoi-image-ref"
@@ -2955,18 +3147,21 @@ defmodule CompanionWeb.StatusLive do
               {if @image_pull_busy, do: "…", else: "pull"}
             </button>
           </div>
+          
           <p class="text-[10px] mt-1.5" style="color: var(--telvm-shell-muted);">
             Pick a chip or paste any Docker reference. Custom CMD may be required for verify to pass.
           </p>
         </div>
-
+        
         <div :if={@saved_pull_refs != []} class="mt-4 max-w-4xl" id="saved-pull-chips">
           <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.12em] mb-2 font-semibold">
             pulled for verify / soak
           </div>
+          
           <p class="text-[10px] mb-2 leading-snug" style="color: var(--telvm-shell-muted);">
             Select a ref to load it into the field above, then run lab verification (same as BYOI).
           </p>
+          
           <div class="flex flex-wrap gap-2">
             <button
               :for={ref <- @saved_pull_refs}
@@ -2986,8 +3181,7 @@ defmodule CompanionWeb.StatusLive do
           </div>
         </div>
       </section>
-      {closed_agents_machines_section(assigns)}
-      <%!-- Lab verification card --%>
+       {closed_agents_machines_section(assigns)} <%!-- Lab verification card --%>
       <section
         class="mb-5 rounded-sm telvm-panel-border border telvm-panel-bg telvm-verify-card p-3 sm:p-4"
         id="lab-verify-card"
@@ -2996,7 +3190,7 @@ defmodule CompanionWeb.StatusLive do
           <div class="telvm-accent-dim-text text-[10px] uppercase tracking-[0.15em] font-semibold">
             lab verification
           </div>
-
+          
           <div
             class="flex rounded overflow-hidden text-[10px]"
             style="border: 1px solid var(--telvm-shell-border);"
@@ -3028,7 +3222,7 @@ defmodule CompanionWeb.StatusLive do
             </button>
           </div>
         </div>
-
+        
         <div :if={@lab_verify_tab == "status"} class="space-y-4">
           <div class="flex flex-wrap items-center gap-4 min-h-[3rem]">
             <div class="flex items-center gap-3">
@@ -3041,14 +3235,14 @@ defmodule CompanionWeb.StatusLive do
                 <span class="relative inline-flex h-9 w-9 rounded-full border-2 telvm-ping-inner">
                 </span>
               </div>
-
+              
               <div
                 :if={@lab_verify_pass and not @vm_preflight_busy and not @soak_busy}
                 class="flex h-12 w-12 items-center justify-center rounded-full border-2 telvm-pass-ring"
               >
                 <.icon name="hero-check-circle" class="size-7 telvm-text-ok" />
               </div>
-
+              
               <div
                 :if={
                   not @lab_verify_pass and not @vm_preflight_busy and not @soak_busy and
@@ -3064,7 +3258,7 @@ defmodule CompanionWeb.StatusLive do
                   idle
                 </span>
               </div>
-
+              
               <div class="text-[11px] max-w-md" style="color: var(--telvm-shell-muted);">
                 <span :if={@vm_preflight_busy} class="telvm-accent-text">Pre-flight running…</span>
                 <span :if={@soak_busy and not @vm_preflight_busy} class="telvm-accent-dim-text">
@@ -3087,7 +3281,7 @@ defmodule CompanionWeb.StatusLive do
                 </span>
               </div>
             </div>
-
+            
             <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
               <button
                 type="button"
@@ -3144,7 +3338,7 @@ defmodule CompanionWeb.StatusLive do
             </div>
           </div>
         </div>
-
+        
         <div :if={@lab_verify_tab == "errors"} class="min-h-[6rem]">
           <p
             :if={@verify_last_error == nil}
@@ -3153,13 +3347,13 @@ defmodule CompanionWeb.StatusLive do
           >
             No errors recorded for the last run.
           </p>
-          <pre
+           <pre
             :if={@verify_last_error != nil}
             class="text-xs font-mono whitespace-pre-wrap break-all rounded-md p-3 overflow-x-auto telvm-error-box"
           >{@verify_last_error}</pre>
         </div>
       </section>
-      <%!-- Build log (Go HTTP lab local build) --%>
+       <%!-- Build log (Go HTTP lab local build) --%>
       <div :if={@image_build_log != [] or @image_build_busy} class="mt-4">
         <div
           class="text-[10px] uppercase tracking-wide mb-1 font-semibold"
@@ -3167,7 +3361,7 @@ defmodule CompanionWeb.StatusLive do
         >
           build
         </div>
-
+        
         <div
           id="image-build-log"
           phx-hook="ScrollBottom"
@@ -3193,24 +3387,21 @@ defmodule CompanionWeb.StatusLive do
       <div class="telvm-accent-border-b border-b pb-2 mb-3 text-[11px] sm:text-xs uppercase tracking-widest telvm-accent-text">
         telvm · OSS
       </div>
-
+      
       <div class="flex flex-wrap gap-3 mb-5">
         <div class="telvm-panel-border border rounded p-3 space-y-2" style="width: 300px;">
           <div class="flex items-baseline gap-2">
             <span class="text-xs font-semibold" style="color: var(--telvm-shell-fg);">
               telvm companion
             </span>
-            <span class="text-[10px] font-mono" style="color: var(--telvm-shell-muted);">
-              Docker
-            </span>
+            <span class="text-[10px] font-mono" style="color: var(--telvm-shell-muted);">Docker</span>
           </div>
+          
           <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono">
             <span style="color: var(--telvm-shell-muted);">status</span>
             <span class="telvm-text-ok">running</span>
             <span style="color: var(--telvm-shell-muted);">engine</span>
-            <span style="color: var(--telvm-shell-fg);">
-              {engine_version_from_report(@report)}
-            </span>
+            <span style="color: var(--telvm-shell-fg);">{engine_version_from_report(@report)}</span>
             <span style="color: var(--telvm-shell-muted);">socket</span>
             <span style="color: var(--telvm-shell-fg);">/var/run/docker.sock</span>
             <span style="color: var(--telvm-shell-muted);">API</span>
@@ -3219,7 +3410,7 @@ defmodule CompanionWeb.StatusLive do
             <span style="color: var(--telvm-shell-fg);">stdio</span>
           </div>
         </div>
-
+        
         <div class="telvm-panel-border border rounded p-3 space-y-2" style="width: 300px;">
           <div class="flex items-baseline gap-2">
             <span class="text-xs font-semibold" style="color: var(--telvm-shell-fg);">
@@ -3229,6 +3420,7 @@ defmodule CompanionWeb.StatusLive do
               PowerShell
             </span>
           </div>
+          
           <div
             :if={@network_agent_snapshot && @network_agent_snapshot.health.status == :ok}
             class="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono"
@@ -3237,45 +3429,49 @@ defmodule CompanionWeb.StatusLive do
             <span class="telvm-text-ok">ok</span>
             <span style="color: var(--telvm-shell-muted);">hostname</span>
             <span style="color: var(--telvm-shell-fg);">
-              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["hostname"]) || "?"}
-            </span>
-            <span style="color: var(--telvm-shell-muted);">version</span>
+              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["hostname"]) ||
+                "?"}
+            </span> <span style="color: var(--telvm-shell-muted);">version</span>
             <span style="color: var(--telvm-shell-fg);">
-              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["version"]) || "?"}
-            </span>
-            <span style="color: var(--telvm-shell-muted);">role</span>
+              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["version"]) ||
+                "?"}
+            </span> <span style="color: var(--telvm-shell-muted);">role</span>
             <span style="color: var(--telvm-shell-fg);">NAT gateway + DHCP</span>
             <span style="color: var(--telvm-shell-muted);">gateway IP</span>
             <span class="telvm-accent-dim-text">
               {@network_agent_snapshot.ics_status["gateway_ip"] || "?"}
-            </span>
-            <span style="color: var(--telvm-shell-muted);">subnet</span>
+            </span> <span style="color: var(--telvm-shell-muted);">subnet</span>
             <span class="telvm-accent-dim-text">
               {@network_agent_snapshot.ics_status["subnet"] || "?"}
-            </span>
-            <span style="color: var(--telvm-shell-muted);">uplink</span>
+            </span> <span style="color: var(--telvm-shell-muted);">uplink</span>
             <span style="color: var(--telvm-shell-fg);">
-              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["ics"] && @network_agent_snapshot.health.data["ics"]["public_adapter"]) || "?"}
-              {if @network_agent_snapshot.health.data && @network_agent_snapshot.health.data["uplink_reachable"], do: " (online)", else: " (offline)"}
-            </span>
-            <span style="color: var(--telvm-shell-muted);">private NIC</span>
+              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["ics"] &&
+                  @network_agent_snapshot.health.data["ics"]["public_adapter"]) || "?"} {if @network_agent_snapshot.health.data &&
+                                                                                              @network_agent_snapshot.health.data[
+                                                                                                "uplink_reachable"
+                                                                                              ],
+                                                                                            do:
+                                                                                              " (online)",
+                                                                                            else:
+                                                                                              " (offline)"}
+            </span> <span style="color: var(--telvm-shell-muted);">private NIC</span>
             <span style="color: var(--telvm-shell-fg);">
-              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["ics"] && @network_agent_snapshot.health.data["ics"]["private_adapter"]) || "?"}
-            </span>
-            <span style="color: var(--telvm-shell-muted);">API</span>
+              {(@network_agent_snapshot.health.data && @network_agent_snapshot.health.data["ics"] &&
+                  @network_agent_snapshot.health.data["ics"]["private_adapter"]) || "?"}
+            </span> <span style="color: var(--telvm-shell-muted);">API</span>
             <span class="telvm-accent-dim-text">:9225</span>
           </div>
+          
           <div
             :if={is_nil(@network_agent_snapshot) || @network_agent_snapshot.health.status != :ok}
             class="text-[11px] font-mono"
             style="color: var(--telvm-shell-muted);"
           >
-            <span class="telvm-text-danger-ink">unreachable</span>
-            <span> - start with </span>
+            <span class="telvm-text-danger-ink">unreachable</span> <span> - start with </span>
             <code class="telvm-accent-dim-text">Start-NetworkAgent.ps1</code>
           </div>
         </div>
-
+        
         <div class="telvm-panel-border border rounded p-3 space-y-2" style="width: 320px;">
           <div class="flex items-baseline gap-2">
             <span class="text-xs font-semibold" style="color: var(--telvm-shell-fg);">
@@ -3285,18 +3481,18 @@ defmodule CompanionWeb.StatusLive do
               Companion / OTP
             </span>
           </div>
+          
           <div
             :if={not @egress_proxy_snapshot.enabled and @egress_proxy_snapshot.workloads == []}
             class="text-[11px] font-mono"
             style="color: var(--telvm-shell-muted);"
           >
-            <span class="telvm-accent-dim-text">disabled</span>
-            <span> — set </span>
-            <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code>
-            <span> and </span>
+            <span class="telvm-accent-dim-text">disabled</span> <span> — set </span>
+            <code class="telvm-accent-dim-text">TELVM_EGRESS_ENABLED=1</code> <span> and </span>
             <code class="telvm-accent-dim-text">TELVM_EGRESS_WORKLOADS</code>
             <span> (see .env.example).</span>
           </div>
+          
           <div
             :if={not @egress_proxy_snapshot.enabled and @egress_proxy_snapshot.workloads != []}
             class="text-[11px] font-mono space-y-1"
@@ -3309,72 +3505,83 @@ defmodule CompanionWeb.StatusLive do
               <span> and restart companion.</span>
             </div>
           </div>
+          
           <div class="space-y-2 text-[11px] font-mono">
             <div
               :if={@egress_proxy_snapshot.enabled}
               class="flex flex-wrap gap-x-2 gap-y-1"
               style="color: var(--telvm-shell-muted);"
             >
-              <span>PubSub</span>
-              <span class="telvm-accent-dim-text">egress_proxy:updates</span>
+              <span>PubSub</span> <span class="telvm-accent-dim-text">egress_proxy:updates</span>
             </div>
+            
             <p
               :if={@egress_proxy_snapshot.enabled and @egress_proxy_snapshot.workloads != []}
               class="text-[10px] leading-snug"
               style="color: var(--telvm-shell-muted);"
             >
-              Other containers use
-              <code class="telvm-accent-dim-text">http://companion:4001</code>
-              /
-              <code class="telvm-accent-dim-text">:4002</code>
-              on the Compose bridge (see workload
-              <span class="telvm-accent-dim-text">proxy</span>
+              Other containers use <code class="telvm-accent-dim-text">http://companion:4001</code>
+              / <code class="telvm-accent-dim-text">:4002</code>
+              on the Compose bridge (see workload <span class="telvm-accent-dim-text">proxy</span>
               below). The host only exposes Phoenix on
               <code class="telvm-accent-dim-text">localhost:4000</code>
               ; egress listeners are inside the companion container. Canonical in-cluster check:
               <.link patch={~p"/machines"} class="underline telvm-accent-dim-text">Machines</.link>
-              → Vendor CLI agents →
-              <span class="telvm-accent-dim-text">Basic soak</span>.
+              → Vendor CLI agents → <span class="telvm-accent-dim-text">Basic soak</span>.
             </p>
+            
             <div
               :if={@egress_proxy_snapshot.workloads == []}
               style="color: var(--telvm-shell-muted);"
             >
               No workloads in config.
             </div>
-            <div :for={w <- @egress_proxy_snapshot.workloads} class="telvm-panel-border border rounded p-2 space-y-1">
+            
+            <div
+              :for={w <- @egress_proxy_snapshot.workloads}
+              class="telvm-panel-border border rounded p-2 space-y-1"
+            >
               <div class="flex flex-wrap gap-x-2">
                 <span style="color: var(--telvm-shell-muted);">id</span>
                 <span style="color: var(--telvm-shell-fg);">{w.id}</span>
               </div>
+              
               <div class="flex flex-wrap gap-x-2">
                 <span style="color: var(--telvm-shell-muted);">proxy</span>
                 <span class="telvm-accent-dim-text break-all">{w.internal_url}</span>
               </div>
+              
               <div class="flex flex-wrap gap-x-2">
                 <span style="color: var(--telvm-shell-muted);">allowlist</span>
                 <span class="telvm-accent-dim-text break-all">{w.allow_digest}</span>
               </div>
+              
               <div class="flex flex-wrap gap-x-2">
                 <span style="color: var(--telvm-shell-muted);">auth inject</span>
                 <span :if={w.inject_auth_configured} class="telvm-text-ok">configured</span>
-                <span :if={not w.inject_auth_configured} style="color: var(--telvm-shell-muted);">off</span>
+                <span :if={not w.inject_auth_configured} style="color: var(--telvm-shell-muted);">
+                  off
+                </span>
               </div>
             </div>
+            
             <div
               :if={@egress_proxy_snapshot.enabled and @egress_proxy_snapshot.recent_denies != []}
               class="space-y-1"
             >
-              <div class="text-[10px] uppercase tracking-wide" style="color: var(--telvm-shell-muted);">
+              <div
+                class="text-[10px] uppercase tracking-wide"
+                style="color: var(--telvm-shell-muted);"
+              >
                 recent denies
               </div>
+              
               <div
                 :for={d <- Enum.take(@egress_proxy_snapshot.recent_denies, 8)}
                 class="term-row text-[10px] break-all"
               >
                 <span class="telvm-accent-dim-text">{d.workload_id}</span>
-                <span style="color: var(--telvm-shell-muted);"> · </span>
-                <span>{d.host}</span>
+                <span style="color: var(--telvm-shell-muted);"> · </span> <span>{d.host}</span>
                 <span style="color: var(--telvm-shell-muted);"> · </span>
                 <span>{inspect(d.reason)}</span>
                 <span style="color: var(--telvm-shell-muted);"> · </span>
@@ -3384,18 +3591,18 @@ defmodule CompanionWeb.StatusLive do
           </div>
         </div>
       </div>
-
+      
       <div>
         <div class="min-w-0 space-y-5">
           <div id="preflight-rollup" data-rollup={to_string(@report.rollup)} class="mb-4 space-y-1">
             <div class="font-semibold" style="color: var(--telvm-shell-fg);">pre-flight</div>
-
+            
             <p class="text-xs leading-relaxed max-w-xl" style="color: var(--telvm-shell-muted);">
               after <span class="telvm-accent-dim-text">docker compose up</span>
               · PubSub <span class="telvm-accent-dim-text">preflight:updates</span>
               · <span class="telvm-accent-dim-text">Companion.PreflightServer</span>
             </p>
-
+            
             <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs sm:text-sm mt-2">
               <span style="color: var(--telvm-shell-muted);">status</span>
               <span class={rollup_class(@report.rollup)}>{rollup_label(@report.rollup)}</span>
@@ -3405,7 +3612,7 @@ defmodule CompanionWeb.StatusLive do
               </span>
             </div>
           </div>
-
+          
           <section class="mb-5" id="lan-hosts-section">
             <div
               class="text-[11px] uppercase tracking-wide mb-1 font-semibold"
@@ -3413,17 +3620,15 @@ defmodule CompanionWeb.StatusLive do
             >
               lan hosts
             </div>
-
+            
             <p class="text-xs mb-2 leading-relaxed max-w-2xl" style="color: var(--telvm-shell-muted);">
               ICS gateway discovery via
               <span class="font-mono telvm-accent-dim-text">telvm-network-agent</span>
-              + Zig agent probe on
-              <span class="font-mono telvm-accent-dim-text">:9100/health</span>.
-              PubSub
-              <span class="font-mono telvm-accent-dim-text">network_agent:updates</span>
+              + Zig agent probe on <span class="font-mono telvm-accent-dim-text">:9100/health</span>.
+              PubSub <span class="font-mono telvm-accent-dim-text">network_agent:updates</span>
               · <span class="font-mono telvm-accent-dim-text">Companion.NetworkAgentPoller</span>
             </p>
-
+            
             <div
               :if={is_nil(@network_agent_snapshot)}
               class="text-xs font-mono py-2"
@@ -3431,7 +3636,7 @@ defmodule CompanionWeb.StatusLive do
             >
               Waiting for first poll from network agent...
             </div>
-
+            
             <div :if={@network_agent_snapshot} class="space-y-2">
               <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
                 <span style="color: var(--telvm-shell-muted);">gateway agent</span>
@@ -3446,55 +3651,62 @@ defmodule CompanionWeb.StatusLive do
                   class="font-mono telvm-text-danger-ink"
                 >
                   unreachable
-                </span>
-                <span style="color: var(--telvm-shell-muted);">·</span>
+                </span> <span style="color: var(--telvm-shell-muted);">·</span>
                 <span class="font-mono tabular-nums" style="color: var(--telvm-shell-muted);">
                   {Calendar.strftime(@network_agent_snapshot.checked_at, "%H:%M:%S")}
-                </span>
-                <span style="color: var(--telvm-shell-muted);">·</span>
+                </span> <span style="color: var(--telvm-shell-muted);">·</span>
                 <span class="font-mono" style="color: var(--telvm-shell-muted);">
                   {@network_agent_snapshot.host_count} host(s) on wire
                 </span>
               </div>
-
+              
               <div
                 :if={@network_agent_snapshot.ics_status != %{}}
                 class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-mono py-1 px-2 rounded telvm-panel-border border"
                 style="color: var(--telvm-shell-muted);"
               >
                 <span>
-                  Gateway: <span class="telvm-accent-dim-text">{@network_agent_snapshot.ics_status["gateway_ip"] || "?"}</span>
-                  <span style="opacity:0.5">(this PC)</span>
+                  Gateway:
+                  <span class="telvm-accent-dim-text">
+                    {@network_agent_snapshot.ics_status["gateway_ip"] || "?"}
+                  </span> <span style="opacity:0.5">(this PC)</span>
                 </span>
                 <span>
-                  Subnet: <span class="telvm-accent-dim-text">{@network_agent_snapshot.ics_status["subnet"] || "?"}</span>
-                </span>
+                  Subnet:
+                  <span class="telvm-accent-dim-text">
+                    {@network_agent_snapshot.ics_status["subnet"] || "?"}
+                  </span>
+                </span> <span>DHCP: <span class="telvm-accent-dim-text">ICS (Windows)</span></span>
                 <span>
-                  DHCP: <span class="telvm-accent-dim-text">ICS (Windows)</span>
-                </span>
-                <span>
-                  Uplink: <span class="telvm-accent-dim-text">{@network_agent_snapshot.ics_status["public_adapter"] || "?"}</span>
+                  Uplink:
+                  <span class="telvm-accent-dim-text">
+                    {@network_agent_snapshot.ics_status["public_adapter"] || "?"}
+                  </span>
                 </span>
               </div>
-
+              
               <div
                 :if={@network_agent_snapshot.hosts != []}
                 class="overflow-x-auto telvm-panel-border border"
               >
                 <div class="grid grid-cols-12 gap-x-2 px-2 py-1 text-[10px] uppercase tracking-wide telvm-term-header">
-                  <span class="col-span-2">ip</span>
-                  <span class="col-span-3">mac</span>
-                  <span class="col-span-2">arp</span>
-                  <span class="col-span-2">zig agent</span>
+                  <span class="col-span-2">ip</span> <span class="col-span-3">mac</span>
+                  <span class="col-span-2">arp</span> <span class="col-span-2">zig agent</span>
                   <span class="col-span-3">hostname</span>
                 </div>
+                
                 <div :for={host <- @network_agent_snapshot.hosts} class="term-row">
                   <div class="col-span-2 font-mono text-xs" style="color: var(--telvm-shell-fg);">
                     {host["ip"]}
                   </div>
-                  <div class="col-span-3 font-mono text-xs truncate" style="color: var(--telvm-shell-muted);">
+                  
+                  <div
+                    class="col-span-3 font-mono text-xs truncate"
+                    style="color: var(--telvm-shell-muted);"
+                  >
                     {host["mac"]}
                   </div>
+                  
                   <div class="col-span-2 text-xs">
                     <span
                       :if={host["state"] in ["Permanent", "Reachable"]}
@@ -3509,6 +3721,7 @@ defmodule CompanionWeb.StatusLive do
                       {host["state"] || "?"}
                     </span>
                   </div>
+                  
                   <div class="col-span-2 text-xs">
                     <span
                       :if={host["zig_agent_status"] == "ok"}
@@ -3530,12 +3743,16 @@ defmodule CompanionWeb.StatusLive do
                       {host["zig_agent_status"] || "?"}
                     </span>
                   </div>
-                  <div class="col-span-3 font-mono text-xs truncate" style="color: var(--telvm-shell-muted);">
+                  
+                  <div
+                    class="col-span-3 font-mono text-xs truncate"
+                    style="color: var(--telvm-shell-muted);"
+                  >
                     {(host["zig_agent_health"] && host["zig_agent_health"]["hostname"]) || "-"}
                   </div>
                 </div>
               </div>
-
+              
               <div
                 :if={@network_agent_snapshot.hosts == []}
                 class="text-xs font-mono py-1"
@@ -3545,7 +3762,7 @@ defmodule CompanionWeb.StatusLive do
               </div>
             </div>
           </section>
-
+          
           <section class="mb-5" id="preflight-gating-section">
             <div
               class="text-[11px] uppercase tracking-wide mb-1"
@@ -3553,11 +3770,11 @@ defmodule CompanionWeb.StatusLive do
             >
               gating
             </div>
-
+            
             <p class="text-xs mb-2" style="color: var(--telvm-shell-muted);">
               Rollup = all pass → ready; any fail → blocked; else degraded (warn/skip).
             </p>
-
+            
             <div class="overflow-x-auto telvm-panel-border border" id="preflight-gating-table">
               <.term_header cols={["check", "st", "detail"]} />
               <div :for={c <- gating_checks(@report)} id={"preflight-row-#{c.id}"} class="term-row">
@@ -3568,9 +3785,9 @@ defmodule CompanionWeb.StatusLive do
                 >
                   {c.title}
                 </div>
-
+                
                 <div class="col-span-2 sm:col-span-2"><.term_status status={c.status} /></div>
-
+                
                 <div
                   class="col-span-12 sm:col-span-5 break-words"
                   style="color: var(--telvm-shell-muted);"
@@ -3580,7 +3797,7 @@ defmodule CompanionWeb.StatusLive do
               </div>
             </div>
           </section>
-
+          
           <section class="mb-5" id="preflight-info-section">
             <div
               class="text-[11px] uppercase tracking-wide mb-1"
@@ -3588,16 +3805,16 @@ defmodule CompanionWeb.StatusLive do
             >
               informational
             </div>
-
+            
             <div class="overflow-x-auto telvm-panel-border border" id="preflight-info-table">
               <.term_header cols={["item", "st", "detail"]} />
               <div :for={c <- info_checks(@report)} class="term-row">
                 <div class="col-span-5 truncate" style="color: var(--telvm-shell-fg);" title={c.title}>
                   {c.title}
                 </div>
-
+                
                 <div class="col-span-2"><.term_status status={c.status} /></div>
-
+                
                 <div
                   class="col-span-12 sm:col-span-5 break-words"
                   style="color: var(--telvm-shell-muted);"
@@ -3607,7 +3824,7 @@ defmodule CompanionWeb.StatusLive do
               </div>
             </div>
           </section>
-
+          
           <section class="mb-5">
             <div
               class="text-[11px] uppercase tracking-wide mb-1"
@@ -3615,7 +3832,7 @@ defmodule CompanionWeb.StatusLive do
             >
               compose
             </div>
-
+            
             <ul class="space-y-2 text-xs">
               <li
                 :for={row <- StackStatus.compose_stack_rows()}
@@ -3623,13 +3840,12 @@ defmodule CompanionWeb.StatusLive do
               >
                 <span style="color: color-mix(in oklch, var(--telvm-shell-fg) 90%, transparent);">
                   {row.name}
-                </span>
-                <span style="color: var(--telvm-shell-muted);"> — </span>
+                </span> <span style="color: var(--telvm-shell-muted);"> — </span>
                 <span style="color: var(--telvm-shell-muted);">{row.note}</span>
               </li>
             </ul>
           </section>
-
+          
           <section id="preflight-missing-list">
             <div
               class="text-[11px] uppercase tracking-wide mb-1"
@@ -3637,35 +3853,34 @@ defmodule CompanionWeb.StatusLive do
             >
               not yet
             </div>
-
+            
             <ul class="text-xs space-y-0.5 font-mono" style="color: var(--telvm-shell-muted);">
               <li>- Docker stats/events + push stream</li>
-
+              
               <li>- ProxyPlug Finch → /app/… sandboxes</li>
-
+              
               <li>- Runtime catalog (5 → 21+ images)</li>
-
+              
               <li>- Sessions, Registry, HealthMonitor vitals UI</li>
             </ul>
           </section>
         </div>
-
       </div>
-
+      
       <div class="mt-4">
         <button
           phx-click="toggle_fyi"
           class="flex items-center gap-1 text-[11px] uppercase tracking-wide cursor-pointer"
           style="color: var(--telvm-shell-muted); background: none; border: none; padding: 0;"
         >
-          <span>{if @fyi_expanded, do: "▾", else: "▸"}</span>
-          <span>api reference</span>
+          <span>{if @fyi_expanded, do: "▾", else: "▸"}</span> <span>api reference</span>
         </button>
         <div :if={@fyi_expanded} class="mt-2">
           <p class="text-xs mb-2" style="color: var(--telvm-shell-muted);">
             Markdown served from <code class="telvm-accent-dim-text">GET /telvm/api/fyi</code>
             — same origin as the control plane.
           </p>
+          
           <iframe
             src={~p"/telvm/api/fyi"}
             class="w-full min-h-[24rem] rounded telvm-panel-border border bg-black/30"

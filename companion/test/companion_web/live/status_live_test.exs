@@ -59,6 +59,9 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ ~s(phx-click="morayeel_run")
     assert html =~ ~s(href="/morayeel")
     assert html =~ ~s(href="/warm")
+    assert html =~ "Operator runbook"
+    assert html =~ "MORAYEEL_HEADLESS"
+    assert html =~ "playwright.dev"
   end
 
   test "GET /other-agents redirects to /machines", %{conn: conn} do

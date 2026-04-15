@@ -2,13 +2,15 @@
  * Playwright Chromium lab: visit TARGET_URL, persist storageState + HAR + run.json.
  * MORAYEEL_CAPTURE=oneshot (default): single navigation then exit.
  * MORAYEEL_CAPTURE=session: CDP + periodic storageState until signal, sentinel file, or optional max time.
+ * MORAYEEL_HEADLESS=1 (default): headless Chromium. Set to 0/false/off for a visible window (local dev; Docker needs a display).
  */
 import { chromium } from "playwright";
 import fs from "fs";
 import path from "path";
 
 const outDir = process.env.OUT_DIR || "/artifacts/run";
-const targetUrl = process.env.TARGET_URL || "http://morayeel_lab:8080/";
+/** When unset: host demos hit companion UI. Docker image sets TARGET_URL to morayeel_lab via ENV. */
+const targetUrl = process.env.TARGET_URL || "http://127.0.0.1:4000/";
 
 fs.mkdirSync(outDir, { recursive: true });
 
@@ -40,6 +42,14 @@ const captureMode = captureModeRaw === "session" ? "session" : "oneshot";
 const cdpPort = Math.max(1, Math.min(65535, parseInt(process.env.MORAYEEL_CDP_PORT || "9222", 10) || 9222));
 const snapshotMs = Math.max(1000, parseInt(process.env.MORAYEEL_STORAGE_SNAPSHOT_MS || "30000", 10) || 30000);
 const maxSessionMs = Math.max(0, parseInt(process.env.MORAYEEL_SESSION_MAX_MS || "0", 10) || 0);
+
+/** Default headless; MORAYEEL_HEADLESS=0|false|no|off opens a real browser window (host use). */
+function envHeadless() {
+  const v = (process.env.MORAYEEL_HEADLESS ?? "1").toString().trim().toLowerCase();
+  if (v === "0" || v === "false" || v === "no" || v === "off") return false;
+  return true;
+}
+const headlessUi = envHeadless();
 
 const contextOpts = {
   recordHar: { path: path.join(outDir, "network.har"), mode: "full" },
@@ -105,8 +115,9 @@ try {
   log(`TARGET_URL=${targetUrl}`);
   log(`proxy=${proxyServer || "(none)"}`);
   log(`MORAYEEL_CAPTURE=${captureMode}`);
+  log(`MORAYEEL_HEADLESS=${headlessUi}`);
 
-  const launchOpts = { headless: true };
+  const launchOpts = { headless: headlessUi };
   if (captureMode === "session") {
     launchOpts.args = [
       `--remote-debugging-port=${cdpPort}`,
@@ -148,7 +159,7 @@ try {
     writeRunJson({
       status: "passed",
       exit_code: 0,
-      capture: { version: 1, mode: "oneshot" },
+      capture: { version: 1, mode: "oneshot", headless: headlessUi },
     });
     process.exit(0);
   }
@@ -209,6 +220,7 @@ try {
     capture: {
       version: 1,
       mode: "session",
+      headless: headlessUi,
       request_summary: requestStats,
       session: {
         cdp_port: cdpPort,
@@ -238,7 +250,7 @@ try {
     status: "failed",
     exit_code: 1,
     error: String(err && err.message ? err.message : err),
-    capture: { version: 1, mode: captureMode },
+    capture: { version: 1, mode: captureMode, headless: headlessUi },
   });
   process.exit(1);
 }
