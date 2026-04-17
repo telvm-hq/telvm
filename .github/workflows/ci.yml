@@ -36,3 +36,25 @@ jobs:
 
       - name: Run ExUnit via Docker Compose
         run: docker compose --profile test run --rm companion_test
+
+  speedeel:
+    name: speedeel (preflight)
+    runs-on: ubuntu-latest
+    container:
+      image: hexpm/elixir:1.17.3-erlang-27.3.2-debian-bookworm-20250317-slim
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: OS packages (node, build tools)
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends \
+            build-essential git curl ca-certificates nodejs npm \
+          && rm -rf /var/lib/apt/lists/*
+
+      - name: mix deps.get + speedeel.preflight
+        working-directory: speedeel
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          mix deps.get
+          mix speedeel.preflight

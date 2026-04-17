@@ -1,0 +1,326 @@
+@import "tailwindcss" source(none);
+@source "../../lib/speedeel_web";
+
+/* --- speedeel: cyberpunk terminal (black / white / orange) --- */
+html {
+  color-scheme: dark;
+  height: 100%;
+  --telvm-shell-bg: oklch(6% 0.02 290);
+  --telvm-shell-elevated: oklch(11% 0.03 290);
+  --telvm-shell-fg: oklch(97% 0.01 285);
+  --telvm-shell-muted: oklch(52% 0.03 285);
+  --telvm-shell-border: oklch(32% 0.04 290);
+  --telvm-panel-bg: oklch(9% 0.025 290 / 0.96);
+  --telvm-input-bg: oklch(5% 0.02 290 / 0.55);
+  --telvm-danger: oklch(62% 0.19 22);
+  --telvm-danger-border: oklch(45% 0.14 22);
+  --telvm-danger-bg: oklch(22% 0.06 22 / 0.35);
+  --telvm-accent: oklch(78% 0.22 55);
+  --telvm-accent-dim: oklch(58% 0.18 55);
+  --telvm-accent-subtle: oklch(88% 0.12 55);
+  --telvm-accent-border: color-mix(in oklch, oklch(78% 0.22 55) 50%, transparent);
+  --telvm-accent-glow: color-mix(in oklch, oklch(78% 0.22 55) 28%, transparent);
+  --telvm-accent-secondary: oklch(72% 0.14 55);
+  --telvm-cyber-edge: color-mix(in oklch, oklch(65% 0.22 310) 35%, transparent);
+  --telvm-ok: oklch(76% 0.14 160);
+  --telvm-warn: oklch(78% 0.14 75);
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  background-color: var(--telvm-shell-bg);
+  color: var(--telvm-shell-fg);
+}
+
+[data-phx-session],
+[data-phx-teleported-src] {
+  display: contents;
+}
+
+/* Subtle scanlines + vignette */
+.telvm-app-shell {
+  position: relative;
+  background-color: var(--telvm-shell-bg);
+  color: var(--telvm-shell-fg);
+  box-shadow: inset 0 0 120px color-mix(in oklch, black 45%, transparent);
+}
+
+.telvm-app-shell::before {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  opacity: 0.04;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    color-mix(in oklch, var(--telvm-accent) 25%, black) 2px,
+    color-mix(in oklch, var(--telvm-accent) 25%, black) 3px
+  );
+}
+
+.telvm-app-shell > header {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--telvm-shell-elevated) 100%, transparent) 0%,
+    color-mix(in oklch, var(--telvm-shell-bg) 40%, transparent) 100%
+  );
+  border-color: var(--telvm-shell-border);
+  box-shadow:
+    0 1px 0 0 var(--telvm-cyber-edge),
+    0 0 24px -8px color-mix(in oklch, var(--telvm-accent) 45%, transparent);
+}
+
+.telvm-app-shell > footer {
+  box-shadow:
+    0 -1px 0 0 var(--telvm-cyber-edge),
+    0 0 20px -10px color-mix(in oklch, var(--telvm-accent) 35%, transparent);
+}
+
+/* Potrace SVG is black; invert for dark UI + soft orange glow */
+.speedeel-double-flag {
+  filter: brightness(0) invert(1)
+    drop-shadow(0 0 3px color-mix(in oklch, var(--telvm-accent) 70%, transparent));
+  opacity: 0.94;
+}
+
+/* Single waving checker “finish line” flag (2D CSS animation); reserve GIF swap here later */
+.speedeel-waving-flag {
+  flex-shrink: 0;
+  width: 52px;
+  height: 34px;
+  border: 1px solid var(--telvm-accent);
+  border-radius: 1px;
+  background-color: #0a0a0a;
+  background-image: repeating-linear-gradient(90deg, #0a0a0a 0 7px, #eaeaea 7px 14px);
+  background-size: 14px 100%;
+  box-shadow:
+    0 0 14px color-mix(in oklch, var(--telvm-accent) 45%, transparent),
+    inset 0 0 10px color-mix(in oklch, var(--telvm-accent) 12%, transparent);
+  transform-origin: 0% 50%;
+  animation:
+    speedeel-flag-bg-flow 2.6s linear infinite,
+    speedeel-flag-sway 2.1s ease-in-out infinite;
+}
+
+.speedeel-waving-flag--sm {
+  width: 30px;
+  height: 20px;
+  background-image: repeating-linear-gradient(90deg, #0a0a0a 0 5px, #eaeaea 5px 10px);
+  background-size: 10px 100%;
+  box-shadow:
+    0 0 10px color-mix(in oklch, var(--telvm-accent) 40%, transparent),
+    inset 0 0 6px color-mix(in oklch, var(--telvm-accent) 10%, transparent);
+}
+
+@keyframes speedeel-flag-bg-flow {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 14px 0;
+  }
+}
+
+.speedeel-waving-flag--sm {
+  animation:
+    speedeel-flag-bg-flow-sm 2.2s linear infinite,
+    speedeel-flag-sway 1.9s ease-in-out infinite;
+}
+
+@keyframes speedeel-flag-bg-flow-sm {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 10px 0;
+  }
+}
+
+@keyframes speedeel-flag-sway {
+  0%,
+  100% {
+    transform: skewY(-2deg) translateY(0);
+  }
+  50% {
+    transform: skewY(2.5deg) translateY(-1px);
+  }
+}
+
+/* Neon hairline dividers (replace checker bars) */
+.speedeel-divider-neon {
+  height: 1px;
+  flex-shrink: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--telvm-accent-border) 15%,
+    var(--telvm-accent) 50%,
+    var(--telvm-accent-border) 85%,
+    transparent
+  );
+  opacity: 0.85;
+}
+
+/* Themed scrollbars (Firefox + WebKit) */
+.speedeel-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--telvm-accent) color-mix(in oklch, var(--telvm-shell-bg) 85%, var(--telvm-panel-bg));
+}
+
+.speedeel-scrollbar::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.speedeel-scrollbar::-webkit-scrollbar-track {
+  background: color-mix(in oklch, var(--telvm-shell-bg) 70%, transparent);
+  border-radius: 4px;
+  margin: 2px 0;
+}
+
+.speedeel-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--telvm-accent) 95%, white),
+    var(--telvm-accent-dim)
+  );
+  border-radius: 4px;
+  border: 1px solid color-mix(in oklch, var(--telvm-accent) 40%, transparent);
+  box-shadow: 0 0 8px color-mix(in oklch, var(--telvm-accent) 55%, transparent);
+}
+
+.speedeel-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--telvm-accent);
+}
+
+.speedeel-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.telvm-accent-text {
+  color: var(--telvm-accent);
+  text-shadow: 0 0 18px color-mix(in oklch, var(--telvm-accent) 35%, transparent);
+}
+
+.telvm-accent-dim-text {
+  color: var(--telvm-accent-dim);
+}
+
+.telvm-accent-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--telvm-accent-border);
+}
+
+.telvm-prose-bar {
+  border-left: 2px solid var(--telvm-accent-border);
+  padding-left: 0.75rem;
+  box-shadow: inset 4px 0 12px -4px color-mix(in oklch, var(--telvm-accent) 15%, transparent);
+}
+
+.telvm-nav-tab-active {
+  border-color: var(--telvm-accent);
+  color: var(--telvm-accent);
+  background-color: var(--telvm-accent-glow);
+  box-shadow:
+    0 0 12px -2px color-mix(in oklch, var(--telvm-accent) 40%, transparent),
+    inset 0 0 0 1px var(--telvm-accent-border);
+}
+
+.telvm-nav-tab-idle {
+  border-color: color-mix(in oklch, var(--telvm-shell-border) 80%, transparent);
+  color: var(--telvm-shell-muted);
+}
+
+.telvm-nav-tab-idle:hover {
+  color: var(--telvm-shell-fg);
+  border-color: var(--telvm-accent-dim);
+  box-shadow: 0 0 8px -4px color-mix(in oklch, var(--telvm-accent) 25%, transparent);
+}
+
+.telvm-text-ok {
+  color: var(--telvm-ok);
+}
+
+.telvm-text-danger-ink {
+  color: color-mix(in oklch, var(--telvm-danger) 92%, white);
+}
+
+.telvm-error-box {
+  border: 1px solid var(--telvm-danger-border);
+  color: color-mix(in oklch, var(--telvm-danger) 88%, white);
+  background-color: color-mix(in oklch, var(--telvm-danger) 8%, transparent);
+}
+
+/* Markdown column */
+.speedeel-prose {
+  line-height: 1.65;
+  color: var(--telvm-shell-fg);
+}
+
+.speedeel-prose h1,
+.speedeel-prose h2,
+.speedeel-prose h3 {
+  color: var(--telvm-shell-fg);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.95em;
+}
+
+.speedeel-prose a {
+  color: var(--telvm-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-shadow: 0 0 12px color-mix(in oklch, var(--telvm-accent) 25%, transparent);
+}
+
+.speedeel-prose a:hover {
+  color: var(--telvm-accent-subtle);
+}
+
+.speedeel-prose code {
+  font-size: 0.9em;
+  background: var(--telvm-input-bg);
+  border: 1px solid var(--telvm-shell-border);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+.speedeel-prose pre {
+  background: var(--telvm-shell-elevated);
+  border: 1px solid var(--telvm-shell-border);
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  white-space: pre;
+  overflow-x: auto;
+  border-radius: 4px;
+  box-shadow: 0 0 20px -8px color-mix(in oklch, var(--telvm-accent) 12%, transparent);
+}
+
+.speedeel-race-wrap {
+  outline: none;
+  box-shadow:
+    0 0 0 1px var(--telvm-accent-border),
+    0 0 32px -6px color-mix(in oklch, var(--telvm-accent) 28%, transparent);
+}
+
+.speedeel-race-wrap:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--telvm-accent),
+    0 0 40px -4px color-mix(in oklch, var(--telvm-accent) 45%, transparent);
+}
+
+.speedeel-dpad-btn {
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.speedeel-circuit-title {
+  letter-spacing: 0.28em;
+  text-shadow: 0 0 20px color-mix(in oklch, var(--telvm-accent) 30%, transparent);
+}
