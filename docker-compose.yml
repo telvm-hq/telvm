@@ -162,6 +162,28 @@ services:
     labels:
       telvm.lab: "morayeel"
 
+  # Standalone Phoenix LiveView guides (Markdown under TELVM_GUIDES_ROOT). Not embedded in Companion.
+  speedeel:
+    build:
+      context: .
+      dockerfile: speedeel/Dockerfile
+    volumes:
+      - ./speedeel:/app
+      - speedeel_deps:/app/deps
+      - speedeel_build:/app/_build
+      - speedeel_assets_node:/app/assets/node_modules
+      - ./docs:/telvm-docs:ro
+    ports:
+      - "4010:4010"
+    environment:
+      MIX_ENV: dev
+      PHX_SERVER: "true"
+      PHX_HOST: "0.0.0.0"
+      PORT: "4010"
+      # Dev watchers + code_reloader break many Docker Desktop bind-mount setups; see speedeel/config/dev.exs
+      SPEEDEEL_DOCKER: "1"
+      TELVM_GUIDES_ROOT: /telvm-docs/events/diy-pawnshop-electric-cars
+
   # One-shot test runner (canonical local/CI-style run inside Linux). Does not start phx.server.
   # Usage: docker compose --profile test run --rm companion_test
   companion_test:
@@ -228,6 +250,9 @@ volumes:
   companion_deps:
   companion_build:
   companion_assets_node:
+  speedeel_deps:
+  speedeel_build:
+  speedeel_assets_node:
   ollama_data:
   goose_config:
   morayeel_runs:

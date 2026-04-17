@@ -4,3 +4,7 @@ companion/_build
 companion/deps
 companion/assets/node_modules
 companion/priv/static/assets
+speedeel/_build
+speedeel/deps
+speedeel/assets/node_modules
+speedeel/priv/static/assets
