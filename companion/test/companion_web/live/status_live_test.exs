@@ -18,6 +18,8 @@ defmodule CompanionWeb.StatusLiveTest do
     assert html =~ ~s(href="/oss-agents")
     assert html =~ ~s(href="/morayeel")
     assert html =~ "/health"
+    assert html =~ "Speedeel minigames"
+    assert html =~ "http://localhost:4010/minigames"
     assert html =~ "api reference"
   end
 

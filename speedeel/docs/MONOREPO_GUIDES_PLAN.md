@@ -1,5 +1,7 @@
 # Guides / labs Phoenix app — monorepo placement
 
+See also the [speedeel docs index](README.md) (minigames planning, engine brief).
+
 ## Decision
 
 **Option A — top-level sibling app** (this repo: `speedeel/` next to `companion/`).

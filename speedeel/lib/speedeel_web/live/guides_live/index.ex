@@ -13,7 +13,7 @@ defmodule SpeedeelWeb.GuidesLive.Index do
   def render(assigns) do
     ~H"""
     <div class="flex flex-1 min-h-0">
-      <.guides_nav pages={@pages} current_slug={nil} />
+      <.guides_nav pages={@pages} nav_active={:circuit} />
       <section class="flex-1 min-h-0 flex flex-col bg-[var(--telvm-shell-bg)]">
         <div class="speedeel-divider-neon shrink-0" aria-hidden="true"></div>
         <div class="flex-1 min-h-0 flex flex-col p-2 sm:p-3 gap-2 overflow-hidden">

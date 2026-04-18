@@ -30,6 +30,8 @@ Upstream issues are cited for **receipts**; telvm’s deeper scoreboard lives in
 
 A **series of minigames** orbiting the same **cart-racing** fantasy—not a parallel product roadmap—could echo the five pains above in playful form (pit stops, telemetry boards, sealed fuel, pit-to-wall radio, endurance laps). **No specs, no dates:** if a mechanic teaches the lesson without a slide deck, it belongs here; if it needs a whitepaper, it belongs in the wiki or companion. **Receipts and long-form positioning:** [docs/wiki/README.md](../docs/wiki/README.md), [telvm#16](https://github.com/telvm-hq/telvm/issues/16).
 
+**Minigames planning (versioned in-repo):** [speedeel/docs/MINIGAMES.md](docs/MINIGAMES.md) (roadmap + execution checklist) and [speedeel/docs/MINIGAMES_ENGINE_PLAN.md](docs/MINIGAMES_ENGINE_PLAN.md) (theme, quartet, 2D Three.js engine). Index: [speedeel/docs/README.md](docs/README.md).
+
 ---
 
 **Today, this repo is:** a standalone Phoenix LiveView app for rendering markdown **guides** from the monorepo (not part of Companion).

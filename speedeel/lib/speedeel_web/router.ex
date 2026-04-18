@@ -15,6 +15,7 @@ defmodule SpeedeelWeb.Router do
 
     live_session :guides, layout: {SpeedeelWeb.Layouts, :app} do
       live "/", GuidesLive.Index, :index
+      live "/minigames", MinigamesLive.Index, :index
       live "/guides/:slug", GuidesLive.Show, :show
     end
   end
