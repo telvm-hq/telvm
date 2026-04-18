@@ -7,7 +7,7 @@ Thanks for helping improve telvm. This document covers how to work on the repo a
 - **Private planning** belongs outside the public tree. The repo [`.gitignore`](../.gitignore) excludes `.internal/` — do not `git add -f` paths under `.internal/`.
 - Prefer **small, focused PRs** with a clear description of behavior change.
 - Match existing **formatting and naming** in Elixir and HEEx; run the project’s usual checks before pushing.
-- **Unfinished or “someone should fix this” work** is tracked in [wiki/BACKLOG.md](wiki/BACKLOG.md) (not buried in README).
+- **Volunteer-friendly build invitations** (telecom / containerized labs) live in [wiki/BACKLOG.md](wiki/BACKLOG.md). Larger phased ideas use linked **`docs/wiki/BACKLOG-*.md`** from that page.
 
 ## Development setup
 
