@@ -15,7 +15,7 @@
 
 ### Recent highlights
 
-Egress proxy hardening, **dirteel** probes, **morayeel** Playwright lab, Vendor CLI / Warm assets UX — see **[docs/CHANGELOG.md](docs/CHANGELOG.md)**. Maintainer PR-split notes and other **wishlist** items: **[docs/wiki/BACKLOG.md](docs/wiki/BACKLOG.md)**.
+Egress proxy hardening, **dirteel** probes, **morayeel** Playwright lab, Vendor CLI / Warm assets UX — see **[docs/CHANGELOG.md](docs/CHANGELOG.md)**. **Curious about telecom?** Build-it-yourself ideas (containerized labs, Zig cluster path): **[docs/wiki/BACKLOG.md](docs/wiki/BACKLOG.md)**.
 
 ### Architecture (overview)
 
@@ -137,7 +137,7 @@ README hero (Warm assets): [`docs/assets/warm-assets-banner.png`](docs/assets/wa
 | Doc | Contents |
 |-----|----------|
 | [docs/wiki/GROUND_TRUTH.md](docs/wiki/GROUND_TRUTH.md) | Compose services, pollers, auth — **repo vs README** |
-| [docs/wiki/BACKLOG.md](docs/wiki/BACKLOG.md) | Contributor wishlist — unfinished work, explicit file pointers |
+| [docs/wiki/BACKLOG.md](docs/wiki/BACKLOG.md) | Telecom learning requests — lab epics in the telvm repo |
 | [docs/quickstart.md](docs/quickstart.md) | `docker compose up`, routes, tests, GHCR lab image, env, LAN, security defaults |
 | [docs/agent-api.md](docs/agent-api.md) | **`/telvm/api`** endpoints, SSE events, scope |
 | [docs/mcp-cursor.md](docs/mcp-cursor.md) | **Cursor + MCP**: build `mcp/`, `.cursor/mcp.json`, verify tools |
