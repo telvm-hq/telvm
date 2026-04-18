@@ -1,6 +1,8 @@
 # Quick start and runbook
 
-**Same spine as the [README](../README.md#start-here-60-seconds):** after Compose is up, **`localhost:4000`** redirects to **`/health`** (stack **Pre-flight**); **`/machines`** is the mission console; **`/telvm/api`** is the agent API ([agent-api.md](agent-api.md)); **Preview** at **`/app/<container>/port/<n>/…`**; **Explorer** (read-only Monaco) at **`/explore/:id`**; human-readable API notes at **`/telvm/api/fyi`**. Glossary: [README — Glossary](../README.md#glossary).
+**Spine:** [README — Start here](../README.md#start-here-60-seconds) for the one-minute path; **this file** is the runbook (egress, vendor CLI, Ollama, LAN, tests).
+
+After Compose is up: **`localhost:4000`** → **`/health`** (Pre-flight); **`/machines`**; **`/telvm/api`** ([agent-api.md](agent-api.md)); **Preview** **`/app/<container>/port/<n>/…`**; **Explorer** **`/explore/:id`**; **`/telvm/api/fyi`**. Glossary: [README — Glossary](../README.md#glossary).
 
 ## Docker (recommended)
 
@@ -12,11 +14,21 @@ If you use **closed-agent upstream submodules** (`third_party/claude-code`, `thi
 docker compose up --build
 ```
 
-Open [http://localhost:4000/machines](http://localhost:4000/machines) for the **Machines** tab (container list, lab controls, **Verify** pre-flight + soak, and **Extended soak**). Stack checks live on **`/health`** (Pre-flight). **`/`** redirects to **`/health`**. **`/topology`** redirects to **`/warm`** (network blueprint ASCII lives on **Warm assets**). Legacy bookmarks **`/images`**, **`/vm-manager-preflight`**, and **`/certificate`** redirect to **`/machines`**. **Explorer** is at **`/explore/:id`** (full-viewport shell, or **`?embed=1`** inline on Machines). For **Cursor**-style automation without the browser, use **[Machine API](agent-api.md)** (`/telvm/api/…`).
+Open [http://localhost:4000/machines](http://localhost:4000/machines) for **Machines**. **`/`** → **`/health`**; **`/topology`** → **`/warm`**. Legacy **`/images`**, **`/vm-manager-preflight`**, **`/certificate`** → **`/machines`**. **Explorer:** **`/explore/:id`**. Automation: **[Machine API](agent-api.md)**.
 
-**Guides (speedeel):** the same Compose file also starts **`speedeel`** — a separate Phoenix LiveView app for markdown under **`TELVM_GUIDES_ROOT`** (default **`docs/events/diy-pawnshop-electric-cars`**). Open **[http://localhost:4010](http://localhost:4010)**. It is **not** embedded in Companion; details in **[`speedeel/README.md`](../speedeel/README.md)**. To run only that service from the app folder: **`cd speedeel && docker compose up`**.
+**Guides (speedeel):** Compose starts **`speedeel`** on **[http://localhost:4010](http://localhost:4010)** — separate app; see **[`speedeel/README.md`](../speedeel/README.md)** or **`cd speedeel && docker compose up`** for guides-only.
 
-Platform pre-flight on **`/health`** covers Postgres, Docker socket, **Finch → Docker Engine** (`GET /version` + labeled container discovery for `vm_node`), ProxyPlug contract, and related rows. The VM manager flow runs via `Companion.VmLifecycle.Runner` and optional soak via `SoakRunner`. Updates use **Phoenix PubSub** (`preflight:updates` and `lifecycle:vm_manager_preflight`). Default Compose brings up **db**, **vm_node** (Node 22 + `telvm.sandbox=true`), **ollama** (inference, port **11434** on the host), **ollama_pull** (one-shot pull of **qwen2.5:0.5b** and **tinyllama**), **goose** (Goose CLI + `telvm.goose` label), **companion** (with **TELVM_EGRESS** enabled and two workloads on internal ports **4001** / **4002**), **speedeel**, **telvm_closed_claude**, and **telvm_closed_codex** (`HTTP_PROXY` / `HTTPS_PROXY` pointed at **companion**). A **`.env`** file is **not** required for this layout. The companion container bind-mounts `./companion` and uses named volumes for `deps`, `_build`, and `assets/node_modules`.
+**Compose rows, pollers, and ports** (authoritative): [wiki — GROUND_TRUTH.md](wiki/GROUND_TRUTH.md).
+
+Pre-flight on **`/health`** includes Postgres, Docker socket, **Finch → Engine**, ProxyPlug, egress cards, and (when configured) **LAN / ICS** from **`NetworkAgentPoller`**. VM manager uses **`Companion.VmLifecycle.Runner`**; soak via **`SoakRunner`**. PubSub: `preflight:updates`, `lifecycle:vm_manager_preflight`. Companion bind-mounts **`./companion`** with named volumes for deps, `_build`, and `assets/node_modules`.
+
+### LAN / Windows network agent (optional)
+
+For a **Windows gateway** (Wi‑Fi uplink + Ethernet to a lab switch), run **[`agents/telvm-network-agent`](../agents/telvm-network-agent/README.md)** elevated; set **`TELVM_NETWORK_AGENT_TOKEN`** on both the agent and companion (**`.env`** or Compose). Compose defaults **`TELVM_NETWORK_AGENT_URL`** to **`http://host.docker.internal:9225`**.
+
+**Companion** starts **`Companion.NetworkAgentPoller`**, which polls the network agent and probes each discovered host at **`http://<ip>:9100/health`** for **[`telvm-node-agent`](../agents/telvm-node-agent/README.md)** (Zig). Set **`TELVM_ZIG_NODE_PROBE_TOKEN`** on companion to the **same** Bearer secret as each Linux agent’s **`--token`** (default in dev is **`test123`** — override for anything beyond trusted LAN).
+
+A separate **static list** poller (**`Companion.ClusterNodePoller`**) exists in the codebase but is **not** supervised, **not** connected to the UI, and **`TELVM_CLUSTER_*` env vars are not loaded** in `runtime.exs` yet — ignore for production until wired. Details: [wiki/GROUND_TRUTH.md](wiki/GROUND_TRUTH.md).
 
 ### Closed-agent egress (verify)
 
@@ -115,7 +127,16 @@ This runs **`scripts/verify-closed-agent-egress.sh`** (same checks as the UI Bas
 
 ### Environment
 
-Optional: copy [`.env.example`](../.env.example) to `.env` only for overrides (cluster nodes, API keys, custom Ollama model names). The default stack does not need a `.env` file.
+Optional: copy [`.env.example`](../.env.example) to `.env` for overrides (network agent tokens, Zig probe token, API keys, Ollama model names). The default stack does not need a `.env` file.
+
+### Security defaults (local dev)
+
+telvm targets **trusted localhost / lab LAN**, not anonymous multi-tenant internet:
+
+- **`/telvm/api`** has **no authentication** — see [agent-api.md](agent-api.md).
+- **Windows network agent** needs elevation and should use a **strong Bearer token**; bind to LAN only in real deployments.
+- **Egress allowlists** (`TELVM_EGRESS_WORKLOADS`) are your outbound policy; extend `allow_hosts` when mirrors or vendors change.
+- **`TELVM_ZIG_NODE_PROBE_TOKEN`** must match **`telvm-node-agent`** on each node; the companion default is for dev only — see [wiki/GROUND_TRUTH.md](wiki/GROUND_TRUTH.md).
 
 ### Registry-backed VM manager pre-flight (optional)
 

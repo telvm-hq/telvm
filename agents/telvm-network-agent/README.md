@@ -71,8 +71,11 @@ TELVM_NETWORK_AGENT_URL=http://host.docker.internal:9225
 TELVM_NETWORK_AGENT_TOKEN=my-secret-token
 ```
 
-The companion's `NetworkAgentPoller` will poll `/health` and `/ics/hosts` and
-broadcast results via PubSub to the dashboard's preflight "Network / ICS" panel.
+The companion's `NetworkAgentPoller` will poll `/health` and `/ics/hosts`,
+probe each discovered host at **`http://<ip>:9100/health`** for **`telvm-node-agent`**
+(see **`TELVM_ZIG_NODE_PROBE_TOKEN`** on companion — must match each node's Bearer token),
+and broadcast via PubSub to the preflight **LAN / ICS** panel. Ground truth:
+**[docs/wiki/GROUND_TRUTH.md](../../docs/wiki/GROUND_TRUTH.md)**.
 
 ## Architecture
 

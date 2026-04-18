@@ -9,7 +9,7 @@
                                            |___/
 ```
 
-Minimal HTTP agent for remote Ubuntu machines in a telvm cluster. Runs as a static Linux binary, proxies a narrow slice of the local Docker Engine API, and exposes a health endpoint. The companion Phoenix app polls these agents over HTTP.
+Minimal HTTP agent for remote Ubuntu machines in a telvm lab. Runs as a static Linux binary, proxies a narrow slice of the local Docker Engine API, and exposes a health endpoint. In the default **LAN** layout, **`NetworkAgentPoller`** (inside companion) probes **`/health`** on **:9100** after the Windows **network agent** discovers hosts — see **[docs/wiki/GROUND_TRUTH.md](../../docs/wiki/GROUND_TRUTH.md)**.
 
 ## Build
 

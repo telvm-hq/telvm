@@ -1,10 +1,11 @@
 defmodule Companion.ClusterNodesConfig do
   @moduledoc """
-  Reads the configured cluster node list from application env.
+  Reads a static cluster node list from application env (`:cluster_nodes`, `:cluster_token`).
 
-  Set `TELVM_CLUSTER_NODES` (JSON array) and `TELVM_CLUSTER_TOKEN` in `.env` /
-  `docker-compose.yml`; `config/runtime.exs` parses them into
-  `config :companion, :cluster_nodes` and `config :companion, :cluster_token`.
+  **`Companion.ClusterNodePoller` is not supervised** and nothing in `runtime.exs` maps
+  `TELVM_CLUSTER_*` env vars into these keys today — tests set them with
+  `Application.put_env/3`. For shipped LAN discovery use **`NetworkAgentPoller`** instead;
+  see **docs/wiki/GROUND_TRUTH.md**.
   """
 
   @spec nodes() :: [%{url: String.t(), label: String.t()}]

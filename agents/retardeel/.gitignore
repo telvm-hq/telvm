@@ -1,0 +1,3 @@
+# Scout assets were removed; ignore if reintroduced locally
+assets/scout/
+**/node_modules/

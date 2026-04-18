@@ -36,6 +36,10 @@ config :companion, :network_agent_url,
 
 config :companion, :network_agent_token, System.get_env("TELVM_NETWORK_AGENT_TOKEN") || ""
 
+# Bearer secret for GET /health on telvm-node-agent when probing LAN IPs from NetworkAgentPoller.
+config :companion, :zig_node_probe_token,
+  System.get_env("TELVM_ZIG_NODE_PROBE_TOKEN") || "test123"
+
 # Per-workload HTTP egress proxy (CONNECT + allowlisted GET). Disabled in :test regardless of env.
 {egress_enabled, egress_workloads} =
   if config_env() == :test do

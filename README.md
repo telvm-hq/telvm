@@ -13,21 +13,9 @@
   <sub>Pre-flight dashboard sample: <a href="docs/assets/cluster-dashboard.png"><code>docs/assets/cluster-dashboard.png</code></a> · wide hero export notes: <a href="docs/assets/BANNER.md">docs/assets/BANNER.md</a></sub>
 </p>
 
-### Recent progress (companion + closed agents)
+### Recent highlights
 
-- **Egress proxy hardening:** listener no longer applies fragile `setopts` after `accept` (avoids RST / curl 56); **CONNECT** parsing fixed so `host:port` is not swallowed into the host token (avoids spurious `malformed_connect` / 403).
-- **dirteel** ([`agents/dirteel`](agents/dirteel)): static Zig **CONNECT** probe + **`profiles/closed_images.json`** aligned with [`ClosedAgents.Catalog`](companion/lib/companion/closed_agents/catalog.ex); **`make check-dirteel-catalog`**; closed images ship **`/usr/local/bin/dirteel`**; Basic soak prefers dirteel when present ([`ClosedAgents.Verify`](companion/lib/companion/closed_agents/verify.ex)).
-- **morayeel** ([`agents/morayeel`](agents/morayeel)): Playwright headless lab on **`telvm_default`**; artifacts on **`morayeel_runs`**; **Morayeel** tab in companion ([`docs/morayeel-verification.md`](docs/morayeel-verification.md)).
-- **Operator UI:** Warm assets and Machines **Vendor CLI** surface workload id, listener URL, and allowlist next to Pre-flight; **Re-verify** command prints **`proxy_ok`** / **`proxy_fail`** so silent `curl` is not mistaken for a hang.
-
-### Suggested PR split (current work)
-
-| Option | PRs | What to bundle |
-|--------|-----|----------------|
-| **Minimal (2)** | **2** | **PR 1 — Egress + companion:** `egress_proxy` listener/connection fixes, `ClosedAgents.Verify`, any `docker-compose` / `runtime.exs` egress tweaks, tests. **PR 2 — Tooling + UX + docs:** `agents/dirteel`, closed Dockerfiles, `Makefile` / `companion_test` mount, `status_live` Warm/Machines copy, catalog labels, **README** / quickstart pointers. |
-| **Granular (3)** | **3** | Split PR 2: **(2a)** dirteel + profiles + CI/catalog sync + image Dockerfiles; **(2b)** LiveView only; **(2c)** README / docs / assets (this banner). |
-
-Pick **2** if you want fewer reviews; pick **3** if reviewers prefer smaller diffs or docs-only PRs land independently.
+Egress proxy hardening, **dirteel** probes, **morayeel** Playwright lab, Vendor CLI / Warm assets UX — see **[docs/CHANGELOG.md](docs/CHANGELOG.md)**. Maintainer PR-split notes and other **wishlist** items: **[docs/wiki/BACKLOG.md](docs/wiki/BACKLOG.md)**.
 
 ### Architecture (overview)
 
@@ -68,12 +56,13 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 
 ## Start here (~60 seconds)
 
-**Wiki / positioning:** single doc index plus the politely scathing landscape — [docs/wiki/README.md](docs/wiki/README.md).
+**Wiki / positioning:** [docs/wiki/README.md](docs/wiki/README.md). **What actually runs** (Compose rows, pollers, auth): [docs/wiki/GROUND_TRUTH.md](docs/wiki/GROUND_TRUTH.md).
 
-1. **Run:** `git clone https://github.com/telvm-hq/telvm.git && cd telvm && docker compose up --build`  
-   Default stack: **Postgres**, **`vm_node`**, **Ollama** + one-shot **`ollama_pull`**, **Goose**, **companion** on **`http://localhost:4000`**, **`speedeel`** (standalone markdown guides on **`http://localhost:4010`** — not part of the dashboard), **`telvm_closed_claude`** / **`telvm_closed_codex`** (vendor CLIs with **`HTTP_PROXY`** to the companion’s egress listeners on **4001** / **4002**). No **`.env`** file is required — defaults are in **`docker-compose.yml`**. After the stack is healthy, verify proxy path: **`./scripts/verify-closed-agent-egress.sh`** (or **`scripts/verify-closed-agent-egress.ps1`** on Windows) — vendor **`curl`** checks plus **`apt-get update`** through the proxy — then **`docker compose logs companion`** and search for **`egress_proxy`** (e.g. **`grep egress_proxy`** or **`findstr egress_proxy`**). Guides app layout and env: **[`speedeel/docs/MONOREPO_GUIDES_PLAN.md`](speedeel/docs/MONOREPO_GUIDES_PLAN.md)** and **[`speedeel/README.md`](speedeel/README.md)** (`TELVM_GUIDES_ROOT` defaults to **`docs/events/diy-pawnshop-electric-cars`** in Compose).
+**Full runbook** (egress verify, vendor CLI soak, Ollama, tests): [docs/quickstart.md](docs/quickstart.md).
 
-2. **Operator UI (browser):** [http://localhost:4000](http://localhost:4000) redirects to **Pre-flight** (`/health`); **Machines** (`/machines`) lists containers, **BYOI** / lab images, **Verify** (VM manager pre-flight + 15s soak) and **Extended soak (60s)**, plus **Vendor CLI agents** (Claude Code / Codex): **pull** published images, **Basic soak** (egress + apt), then **Warm assets** (`/warm`). Step-by-step for clones (including **curl exit 56** triage): **[docs/quickstart.md — Vendor CLI agents (5 min)](docs/quickstart.md#vendor-cli-agents-5-min)**. Human-facing dashboard (LiveView). **Core loop (labs):** pull any lab image, run **Verify**; when it passes, that container shows up on **Warm assets** with port preview, **files** (Explorer / Monaco), and **container logs** (same log text is available to agents at **`GET /telvm/api/machines/:id/logs`**).
+1. **Run:** `git clone https://github.com/telvm-hq/telvm.git && cd telvm && docker compose up --build` — **companion** on **`http://localhost:4000`**, **`speedeel`** on **`http://localhost:4010`**. No **`.env`** required for defaults (**`docker-compose.yml`**). After healthy: **`./scripts/verify-closed-agent-egress.sh`** (or **`scripts/verify-closed-agent-egress.ps1`**) then **`docker compose logs companion`** and filter **`egress_proxy`**. Guides: **[`speedeel/README.md`](speedeel/README.md)** (`TELVM_GUIDES_ROOT` in Compose).
+
+2. **Operator UI (browser):** [http://localhost:4000](http://localhost:4000) → **Pre-flight**; **Machines** (`/machines`) for labs, **Verify**, **Vendor CLI agents**, **Warm assets** (`/warm`). Vendor CLI walkthrough: [quickstart — Vendor CLI agents (5 min)](docs/quickstart.md#vendor-cli-agents-5-min). **Core loop:** **Verify** a lab → container on **Warm assets** (preview, Explorer, logs; agents: **`GET /telvm/api/machines/:id/logs`**).
 
 3. **Optional — OSS Agents (`/oss-agents`, bookmark `/agent` redirects):** Local **[Ollama](https://ollama.com/)** (OpenAI-compatible HTTP API) runs as a **separate Compose service**; model weights live in Ollama’s Docker volume, **not** inside Phoenix. The optional **Goose** service uses Engine **exec** for in-container agent turns. Runbook: **[docs/quickstart.md — Ollama & OSS Agents](docs/quickstart.md#ollama-oss-agents--cpu-smoke)**.
 
@@ -83,7 +72,7 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 
 5. **Preview and visibility:** **`/app/<container>/port/<n>/…`** reverse-proxies HTTP into a container (same links appear as **proxy URLs** from the API and port links on Machines). **`/explore/<container_id>`** is the read-only filesystem + **Monaco** editor shell for code inside a running lab.
 
-6. **Optional — Cluster nodes (Ubuntu hosts with Docker Engine):** Deploy the lightweight **[`telvm-node-agent`](agents/telvm-node-agent/README.md)** (Zig binary) to each host; it exposes `/health` and proxies a narrow Docker Engine slice over HTTP. Set **`TELVM_CLUSTER_NODES`** (JSON array) and **`TELVM_CLUSTER_TOKEN`** in **`.env`** (see **`.env.example`**); the companion's **`Companion.ClusterNodePoller`** polls each agent and broadcasts results on PubSub — Pre-flight shows a **cluster nodes** table when configured. For **physical LAN bring-up** (networking, netplan, ICS), see **[docs/lan-cluster-network-primer.md](docs/lan-cluster-network-primer.md)** and **[inventories/lan-host/README.md](inventories/lan-host/README.md)**.
+6. **Optional — LAN lab (Windows gateway + Ubuntu nodes):** On the Windows PC, run **[`telvm-network-agent`](agents/telvm-network-agent/README.md)** (PowerShell, elevated). Compose sets **`TELVM_NETWORK_AGENT_URL`** (default **`http://host.docker.internal:9225`**); **`Companion.NetworkAgentPoller`** polls that agent, discovers ICS/LAN hosts, and probes each IP for **`telvm-node-agent`** on **:9100** — Pre-flight shows **LAN / ICS** when the URL is set. Use **`TELVM_NETWORK_AGENT_TOKEN`** / **`TELVM_ZIG_NODE_PROBE_TOKEN`** so Bearer auth lines up (see [GROUND_TRUTH](docs/wiki/GROUND_TRUTH.md)). **Physical bring-up** (netplan, UniFi, SSH): **[docs/lan-cluster-network-primer.md](docs/lan-cluster-network-primer.md)**, **[inventories/lan-host/README.md](inventories/lan-host/README.md)**. **Note:** **`Companion.ClusterNodePoller`** (static node list) exists in code but is **not** supervised, not UI-wired, and **`TELVM_CLUSTER_*` is not read in `runtime.exs` yet** — [GROUND_TRUTH](docs/wiki/GROUND_TRUTH.md).
 
 **Operator surfaces on one port:** dashboard pages (`/`, `/health`, `/warm`, `/machines`, **`/oss-agents`** (`/agent` redirects; legacy **`/other-agents`** redirects to **`/machines`**), …), **`/telvm/api/…`** for tools, and **`/app/…` + `/explore/…`** to see and open workloads — [Architecture](docs/ARCHITECTURE.md). **`/topology`** redirects to **`/warm`** (bookmark compatibility). **PubSub, SSE vs LiveView, and what agents see vs the UI:** [Plumbing](docs/plumbing.md).
 
@@ -147,7 +136,9 @@ README hero (Warm assets): [`docs/assets/warm-assets-banner.png`](docs/assets/wa
 
 | Doc | Contents |
 |-----|----------|
-| [docs/quickstart.md](docs/quickstart.md) | `docker compose up`, routes, tests, GHCR lab image, env |
+| [docs/wiki/GROUND_TRUTH.md](docs/wiki/GROUND_TRUTH.md) | Compose services, pollers, auth — **repo vs README** |
+| [docs/wiki/BACKLOG.md](docs/wiki/BACKLOG.md) | Contributor wishlist — unfinished work, explicit file pointers |
+| [docs/quickstart.md](docs/quickstart.md) | `docker compose up`, routes, tests, GHCR lab image, env, LAN, security defaults |
 | [docs/agent-api.md](docs/agent-api.md) | **`/telvm/api`** endpoints, SSE events, scope |
 | [docs/mcp-cursor.md](docs/mcp-cursor.md) | **Cursor + MCP**: build `mcp/`, `.cursor/mcp.json`, verify tools |
 | [docs/plumbing.md](docs/plumbing.md) | PubSub topics, dashboard vs **`/telvm/api/stream`**, Docker pull vs SSE |

@@ -80,13 +80,13 @@ Details: [retardeel/README.md](retardeel/README.md)
 
 ## `telvm-node-agent/` — Linux node + Docker slice (Zig)
 
-**Role:** Runs on **Ubuntu** cluster nodes; narrow **Docker Engine HTTP** proxy + health. Companion **polls** these agents to show machines / engine state.
+**Role:** Runs on **Ubuntu** lab nodes; narrow **Docker Engine HTTP** proxy + **`/health`**. With **`telvm-network-agent`** on a Windows gateway, **`NetworkAgentPoller`** discovers LAN IPs and **probes :9100** (Bearer **`TELVM_ZIG_NODE_PROBE_TOKEN`**) so Pre-flight can show node health. A separate static-list poller exists but is not shipped; see [docs/wiki/GROUND_TRUTH.md](../docs/wiki/GROUND_TRUTH.md).
 
 ```
-  [ companion ] ----HTTP poll----> [ telvm-node-agent :9100 ]
-                                           |
-                                           v
-                                    [ docker.sock ]
+  [ companion ] --probe--> [ telvm-node-agent :9100 ]
+                                   |
+                                   v
+                            [ docker.sock ]
 ```
 
 Details: [telvm-node-agent/README.md](telvm-node-agent/README.md)

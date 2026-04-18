@@ -17,7 +17,6 @@ defmodule Companion.NetworkAgentPoller do
 
   @default_interval :timer.seconds(30)
   @zig_agent_port 9100
-  @zig_agent_token "test123"
   @zig_probe_timeout 4_000
 
   def topic, do: "network_agent:updates"
@@ -145,10 +144,11 @@ defmodule Companion.NetworkAgentPoller do
 
   defp probe_health(base_url) do
     url = base_url <> "/health"
+    token = zig_node_probe_token()
 
     headers =
-      if @zig_agent_token != "" do
-        [{"authorization", "Bearer #{@zig_agent_token}"}]
+      if token != "" do
+        [{"authorization", "Bearer #{token}"}]
       else
         []
       end
@@ -180,5 +180,9 @@ defmodule Companion.NetworkAgentPoller do
 
   defp network_agent_token do
     Application.get_env(:companion, :network_agent_token, "")
+  end
+
+  defp zig_node_probe_token do
+    Application.get_env(:companion, :zig_node_probe_token, "test123")
   end
 end

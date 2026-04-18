@@ -1,12 +1,16 @@
 defmodule Companion.ClusterNodePoller do
   @moduledoc """
-  Periodic health poller for remote telvm node agents.
+  Periodic health poller for a **static** list of remote telvm node agent URLs.
 
   Ticks every `interval_ms` (default 30s), calls `GET /health` on each configured
-  node via `Companion.ClusterNode.impl()`, and broadcasts results on PubSub so
-  LiveView or other subscribers render cluster status without making their own HTTP calls.
+  node via `Companion.ClusterNode.impl()`, and broadcasts on PubSub topic
+  **`cluster_nodes:updates`**.
 
-  Exposes `snapshot/0` for IEx exploration:
+  **Not started** from `Companion.Application` today — no LiveView subscribes to the
+  topic. Prefer **`NetworkAgentPoller`** + Windows network agent for LAN. See
+  **docs/wiki/GROUND_TRUTH.md**.
+
+  Exposes `snapshot/0` for tests and IEx:
 
       iex> Companion.ClusterNodePoller.snapshot()
   """
