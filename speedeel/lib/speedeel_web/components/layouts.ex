@@ -66,7 +66,12 @@ defmodule SpeedeelWeb.Layouts do
   end
 
   attr :pages, :list, required: true
-  attr :current_slug, :any, default: nil
+  @doc """
+  `:circuit` — home / Three.js showcase.
+  `:minigames` — Hospitality Catacombs.
+  `{:guide, slug}` — markdown guide.
+  """
+  attr :nav_active, :any, required: true
 
   def guides_nav(assigns) do
     ~H"""
@@ -98,35 +103,45 @@ defmodule SpeedeelWeb.Layouts do
       </div>
       <div class="px-2 py-2 flex-1 min-h-0 flex flex-col">
         <%= if @pages == [] do %>
-          <p class="text-[11px] text-[var(--telvm-shell-muted)]">No .md in root.</p>
-        <% else %>
-          <nav class="speedeel-scrollbar flex flex-col gap-0.5 max-h-[50vh] overflow-y-auto overflow-x-hidden pr-1.5 -mr-0.5">
+          <p class="text-[11px] text-[var(--telvm-shell-muted)] mb-2">No .md in root.</p>
+        <% end %>
+        <nav class="speedeel-scrollbar flex flex-col gap-0.5 max-h-[50vh] overflow-y-auto overflow-x-hidden pr-1.5 -mr-0.5">
+          <.link
+            navigate={~p"/"}
+            class={[
+              "block rounded border px-2 py-1.5 text-[11px] leading-tight transition-all duration-150",
+              @nav_active == :circuit && "telvm-nav-tab-active border",
+              @nav_active != :circuit && "telvm-nav-tab-idle border border-transparent"
+            ]}
+          >
+            <span class="text-[var(--telvm-shell-fg)]">circuit</span>
+            <span class="block text-[10px] text-[var(--telvm-shell-muted)]">home / game</span>
+          </.link>
+          <.link
+            navigate={~p"/minigames"}
+            class={[
+              "block rounded border px-2 py-1.5 text-[11px] leading-tight transition-all duration-150",
+              @nav_active == :minigames && "telvm-nav-tab-active border",
+              @nav_active != :minigames && "telvm-nav-tab-idle border border-transparent"
+            ]}
+          >
+            <span class="text-[var(--telvm-shell-fg)]">catacombs</span>
+            <span class="block text-[10px] text-[var(--telvm-shell-muted)]">guest map / soon</span>
+          </.link>
+          <%= for p <- @pages do %>
             <.link
-              navigate={~p"/"}
+              navigate={~p"/guides/#{p.slug}"}
               class={[
                 "block rounded border px-2 py-1.5 text-[11px] leading-tight transition-all duration-150",
-                @current_slug == nil && "telvm-nav-tab-active border",
-                @current_slug != nil && "telvm-nav-tab-idle border border-transparent"
+                @nav_active == {:guide, p.slug} && "telvm-nav-tab-active border",
+                @nav_active != {:guide, p.slug} && "telvm-nav-tab-idle border border-transparent"
               ]}
             >
-              <span class="text-[var(--telvm-shell-fg)]">circuit</span>
-              <span class="block text-[10px] text-[var(--telvm-shell-muted)]">home / game</span>
+              <span class="text-[var(--telvm-shell-fg)]">{p.title}</span>
+              <span class="block text-[10px] text-[var(--telvm-shell-muted)] truncate">{p.basename}</span>
             </.link>
-            <%= for p <- @pages do %>
-              <.link
-                navigate={~p"/guides/#{p.slug}"}
-                class={[
-                  "block rounded border px-2 py-1.5 text-[11px] leading-tight transition-all duration-150",
-                  @current_slug == p.slug && "telvm-nav-tab-active border",
-                  @current_slug != p.slug && "telvm-nav-tab-idle border border-transparent"
-                ]}
-              >
-                <span class="text-[var(--telvm-shell-fg)]">{p.title}</span>
-                <span class="block text-[10px] text-[var(--telvm-shell-muted)] truncate">{p.basename}</span>
-              </.link>
-            <% end %>
-          </nav>
-        <% end %>
+          <% end %>
+        </nav>
       </div>
     </aside>
     """

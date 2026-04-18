@@ -63,6 +63,10 @@ config :phoenix, :json_library, Jason
 # Windows dev: avoid symlink noise for colocated LiveView JS (Docker/Linux is unaffected).
 config :phoenix_live_view, :colocated_js, disable_symlink_warning: true
 
+# speedeel labs (minigames) — full URL for Companion nav link. In Docker, set e.g. http://host.docker.internal:4010/minigames
+config :companion, :speedeel_minigames_url,
+  System.get_env("TELVM_SPEEDEEL_MINIGAMES_URL") || "http://localhost:4010/minigames"
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

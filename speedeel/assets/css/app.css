@@ -324,3 +324,46 @@ body {
   letter-spacing: 0.28em;
   text-shadow: 0 0 20px color-mix(in oklch, var(--telvm-accent) 30%, transparent);
 }
+
+/* --- Hospitality Catacombs (/minigames): palette + pixel stage --- */
+.speedeel-dungeon-root {
+  --dungeon-molasses: #0d0a12;
+  --dungeon-peach-pit: #3a2f3d;
+  --dungeon-warm-milk: #f3e9dc;
+  --dungeon-sour-honey: #d4a017;
+  --dungeon-old-gold: #c9a227;
+  --dungeon-lichen: #9a8b98;
+}
+
+.speedeel-dungeon-stage {
+  position: relative;
+  background: radial-gradient(
+    ellipse at 50% 20%,
+    color-mix(in oklch, var(--dungeon-sour-honey) 22%, transparent) 0%,
+    transparent 55%
+  ),
+    linear-gradient(180deg, var(--dungeon-molasses) 0%, #050308 100%);
+  border: 1px solid color-mix(in oklch, var(--dungeon-peach-pit) 70%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklch, var(--dungeon-warm-milk) 8%, transparent),
+    inset 0 0 48px -12px rgba(0, 0, 0, 0.65);
+}
+
+.speedeel-dungeon-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.speedeel-dungeon-card {
+  border: 1px solid color-mix(in oklch, var(--dungeon-peach-pit) 55%, transparent);
+  background: color-mix(in oklch, var(--dungeon-molasses) 88%, transparent);
+}
+
+.speedeel-dungeon-footer {
+  border-top: 1px solid color-mix(in oklch, var(--dungeon-peach-pit) 40%, transparent);
+}

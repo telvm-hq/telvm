@@ -4366,6 +4366,12 @@ defmodule CompanionWeb.StatusLive do
   attr :active, :atom, required: true
 
   defp terminal_nav(assigns) do
+    assigns =
+      assign(assigns, :speedeel_minigames_href,
+        Application.get_env(:companion, :speedeel_minigames_url) ||
+          "http://localhost:4010/minigames"
+      )
+
     ~H"""
     <nav class="flex flex-wrap gap-2 text-xs mb-4" aria-label="Companion views">
       <.link patch={~p"/warm"} class={nav_tab_class(@active, :warm_assets)}>Warm assets</.link>
@@ -4373,6 +4379,14 @@ defmodule CompanionWeb.StatusLive do
       <.link patch={~p"/oss-agents"} class={nav_tab_class(@active, :oss_agents)}>OSS Agents</.link>
       <.link patch={~p"/morayeel"} class={nav_tab_class(@active, :morayeel)}>Morayeel</.link>
       <.link patch={~p"/health"} class={nav_tab_class(@active, :preflight)}>Pre-flight</.link>
+      <a
+        href={@speedeel_minigames_href}
+        class="px-2 py-0.5 border border-dashed rounded-sm transition-colors telvm-nav-tab-idle"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Speedeel minigames
+      </a>
     </nav>
     """
   end

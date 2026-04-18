@@ -24,7 +24,7 @@ defmodule SpeedeelWeb.GuidesLive.Show do
   def render(assigns) do
     ~H"""
     <div class="flex flex-1 min-h-0">
-      <.guides_nav pages={@pages} current_slug={@slug} />
+      <.guides_nav pages={@pages} nav_active={{:guide, @slug}} />
       <section class="speedeel-scrollbar flex-1 min-h-0 overflow-y-auto bg-[var(--telvm-shell-bg)]">
         <div class="speedeel-divider-neon shrink-0" aria-hidden="true"></div>
         <div class="p-3 sm:p-4 max-w-3xl">
