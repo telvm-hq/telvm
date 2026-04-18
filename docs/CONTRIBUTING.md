@@ -7,6 +7,7 @@ Thanks for helping improve telvm. This document covers how to work on the repo a
 - **Private planning** belongs outside the public tree. The repo [`.gitignore`](../.gitignore) excludes `.internal/` — do not `git add -f` paths under `.internal/`.
 - Prefer **small, focused PRs** with a clear description of behavior change.
 - Match existing **formatting and naming** in Elixir and HEEx; run the project’s usual checks before pushing.
+- **Unfinished or “someone should fix this” work** is tracked in [wiki/BACKLOG.md](wiki/BACKLOG.md) (not buried in README).
 
 ## Development setup
 
@@ -46,7 +47,7 @@ See [`assets/SOCIAL_PREVIEW.md`](assets/SOCIAL_PREVIEW.md) for **1280×640** Git
 
 1. Tag from the commit you intend to ship: `git tag -a v0.1.0 -m "Release notes summary"`.
 2. Push the tag: `git push origin v0.1.0`.
-3. On GitHub: **Releases → Draft a new release**, choose the tag, add notes (high-level changes, upgrade steps if any). Draft text examples: [`releases/v0.1.0.md`](releases/v0.1.0.md), [`releases/v1.1.0.md`](releases/v1.1.0.md). For a docs-only PR that ships these notes, see [`releases/PR_BODY_v1.1.0.md`](releases/PR_BODY_v1.1.0.md).
+3. On GitHub: **Releases → Draft a new release**, choose the tag, add notes (high-level changes, upgrade steps if any). Draft text examples: [`releases/v0.1.0.md`](releases/v0.1.0.md), [`releases/v1.1.0.md`](releases/v1.1.0.md). For a docs-only PR that ships these notes, see [`releases/PR_BODY_v1.1.0.md`](releases/PR_BODY_v1.1.0.md). Index of maintainer artifacts in this folder: [`releases/README.md`](releases/README.md).
 
 ## Labels
 

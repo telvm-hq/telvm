@@ -91,7 +91,9 @@ From the repo root on Windows:
 
 ## Cluster over HTTP (companion integration)
 
-Instead of raw TCP probes from the companion container, deploy the **[`telvm-node-agent`](../../agents/telvm-node-agent/README.md)** Zig binary to each host. The companion polls `GET /health` on each agent over HTTP; results appear on the **Pre-flight** page when `TELVM_CLUSTER_NODES` is set.
+Deploy **[`telvm-node-agent`](../../agents/telvm-node-agent/README.md)** (Zig) on each Ubuntu node (**`:9100`**, Bearer token). With the **Windows `telvm-network-agent`** running and **`TELVM_NETWORK_AGENT_URL`** set on companion (default in Compose: **`http://host.docker.internal:9225`**), **`Companion.NetworkAgentPoller`** discovers LAN hosts via ICS/ARP and probes **`http://<ip>:9100/health`** — results show on **Pre-flight** under **LAN / ICS**. Align **`TELVM_ZIG_NODE_PROBE_TOKEN`** on companion with each node agent’s token.
+
+**`Companion.ClusterNodePoller`** (static node list) exists in code but is **not** supervised, not UI-wired, and cluster env is **not** loaded in companion **`runtime.exs` yet**; see **[docs/wiki/GROUND_TRUTH.md](../../docs/wiki/GROUND_TRUTH.md)**.
 
 See **[agents/telvm-node-agent/README.md](../../agents/telvm-node-agent/README.md)** for build, deploy, API, and systemd setup.
 

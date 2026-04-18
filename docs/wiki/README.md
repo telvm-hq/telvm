@@ -61,7 +61,10 @@ telvm does **not** train frontier models, does not own the safety narrative insi
 
 | Topic | Doc |
 |--------|-----|
+| **What runs vs what is only code** (Compose, pollers, auth) | [GROUND_TRUTH.md](GROUND_TRUTH.md) |
+| **Contributor wishlist** (unfinished / good token sinks) | [BACKLOG.md](BACKLOG.md) |
 | Run the stack, vendor CLI agents, Ollama | [../quickstart.md](../quickstart.md) |
+| Local security assumptions | [../quickstart.md#security-defaults-local-dev](../quickstart.md#security-defaults-local-dev) |
 | OTP, Finch, Docker UDS, routing | [../ARCHITECTURE.md](../ARCHITECTURE.md) |
 | Machine API (JSON + SSE) | [../agent-api.md](../agent-api.md) |
 | PubSub, SSE vs LiveView | [../plumbing.md](../plumbing.md) |

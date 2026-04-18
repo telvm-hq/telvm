@@ -59,3 +59,7 @@ yarn-error.log*
 
 # DETS persistence files (future)
 *.dets
+
+# Zig (agent builds)
+**/.zig-cache/
+zig-out/
