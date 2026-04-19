@@ -4,6 +4,8 @@
 
 **Related:** [internal-claude-code-codex-devcontainers.md](internal-claude-code-codex-devcontainers.md) · [closed-agent-docker-labels.md](closed-agent-docker-labels.md)
 
+**Out of scope here:** **Ollama** (local inference utility, pinned Docker image + HTTP smoke) — [utilities-ollama.md](utilities-ollama.md). Not a closed-agent submodule.
+
 ---
 
 ## 1. Rationale

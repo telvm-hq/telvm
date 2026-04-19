@@ -72,6 +72,8 @@ Compose runs **[Ollama](https://ollama.com/)** with a named volume for weights (
 
 After `docker compose up --build` settles, open **[http://localhost:4000/oss-agents](http://localhost:4000/oss-agents)** (legacy **`/agent`** redirects here). The page **auto-probes** Ollama (OpenAI-compatible `GET /v1/models`), lists models, and when possible **starts the Model tab chat** with **`TELVM_AGENT_DEFAULT_MODEL`** (default **`qwen2.5:0.5b`**). The **Goose agent** tab is the default for in-container chat. Use **Refresh models** to re-fetch after changing the base URL. The companion uses **`TELVM_INFERENCE_BASE_URL=http://ollama:11434/v1`** on the Compose network.
 
+**Maintainers:** Ollama is a **utility** (pinned image, quarterly/CVE bump process) — [utilities-ollama.md](utilities-ollama.md). Quick HTTP smoke from repo root: **`./scripts/smoke-ollama.sh`** or **`./scripts/smoke-ollama.ps1`** (after weights are pulled).
+
 Optional manual smoke on the host (sequential, one model at a time):
 
 ```bash

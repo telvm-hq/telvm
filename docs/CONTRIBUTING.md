@@ -24,6 +24,10 @@ git submodule update --init --recursive
 
 CI workflows that build those images use **`actions/checkout` with `submodules: recursive`**. If submodule directories are empty, local **`docker build -f images/telvm-closed-*/Dockerfile .`** still works (Dockerfiles install from npm), but you will miss upstream reference files until submodules are initialized.
 
+### Ollama (utility runtime — not closed-agent)
+
+**Ollama** is a **local inference utility** (pinned Docker image in Compose, OpenAI-compatible HTTP). It is **not** governed by the closed-agent submodule policy. Maintainers: update cadence, image pin, and **`GET /v1/models` + `POST /v1/chat/completions`** smoke — [utilities-ollama.md](utilities-ollama.md) (`scripts/smoke-ollama.sh`, `scripts/smoke-ollama.ps1`).
+
 ## Before you open a PR
 
 1. Run the **full test suite** the same way CI does (Docker Compose command above), or `mix test` from `companion/` with `TEST_DATABASE_URL` / Postgres configured.
