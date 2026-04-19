@@ -106,7 +106,7 @@ The **OSS Agents** tab (`/oss-agents` in [`StatusLive`](../companion/lib/compani
 - **Health:** [**`Companion.GooseHealth`**](../companion/lib/companion/goose_health.ex) periodically probes the Goose container and publishes to LiveView.
 - **Vendor CLI agents (on Machines):** closed vendor containers (**`telvm.agent=closed`**) can run **Basic soak** (Engine **exec**: curl via egress proxy + `apt-get update`); on success they register in **`Companion.ClosedAgentWarmRegistry`** and appear on **Warm assets** alongside labs (in-memory until companion restart). Compose project for discovery defaults to **`telvm`**; override with **`TELVM_COMPOSE_PROJECT`** if needed.
 
-Configure inference URLs and default model at runtime ([`config/runtime.exs`](../companion/config/runtime.exs)); operators configure Goose inside the Goose container (`goose configure`). See [quickstart — Ollama & OSS Agents](quickstart.md#ollama-oss-agents--cpu-smoke).
+Configure inference URLs and default model at runtime ([`config/runtime.exs`](../companion/config/runtime.exs)); operators configure Goose inside the Goose container (`goose configure`). See [quickstart — Ollama & OSS Agents](quickstart.md#ollama-oss-agents--cpu-smoke). **Ollama image pin + smoke** (utility, not closed-agent): [utilities-ollama.md](utilities-ollama.md).
 
 ## Host, Compose, and a single published port
 

@@ -29,8 +29,9 @@ services:
       telvm.runtime: "node"
 
   # OpenAI-compatible inference for Agent setup (/agent). CPU-first: no GPU devices; optional envs reduce parallel load.
+  # Image pin: bump with docs/utilities-ollama.md (quarterly / CVE / breaking /v1).
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.20.5
     ports:
       - "11434:11434"
     volumes:
@@ -59,7 +60,7 @@ services:
 
   # One-shot: wait for ollama API, then pull two small models (disk only; inference loads one at a time as needed).
   ollama_pull:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.20.5
     depends_on:
       ollama:
         condition: service_started

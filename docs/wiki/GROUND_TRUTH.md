@@ -8,7 +8,7 @@ Single place for **what actually runs** after `docker compose up --build`, ports
 |--------|------------|------|-----------------|
 | `db` | (internal) | Postgres 16 | `telvm_pgdata` |
 | `vm_node` | — | Node 22 HTTP on 3333; labels for Engine discovery | — |
-| `ollama` | **11434** | Inference | `ollama_data` |
+| `ollama` | **11434** | Inference (`ollama/ollama` semver pin; see [utilities-ollama.md](../utilities-ollama.md)) | `ollama_data` |
 | `ollama_pull` | — | One-shot model pull | restart: no |
 | `goose` | — | Goose CLI; `telvm.goose` label | `goose_config` |
 | `morayeel_lab` | — | Synthetic cookie lab for Playwright | — |

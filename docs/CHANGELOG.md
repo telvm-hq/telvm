@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Ollama utility (docs + smoke)
+
+- **Docs:** [utilities-ollama.md](utilities-ollama.md) — utility (not closed-agent): pin cadence, **`GET /v1/models`** + **`POST /v1/chat/completions`** smoke; **five-family** model catalog (Qwen, Llama, Gemma, **Phi (Microsoft)**, Mistral).
+- **Scripts:** [`scripts/smoke-ollama.sh`](../scripts/smoke-ollama.sh), [`scripts/smoke-ollama.ps1`](../scripts/smoke-ollama.ps1).
+- **Compose:** [`docker-compose.yml`](../docker-compose.yml) pins **`ollama/ollama:0.20.5`** for `ollama` and `ollama_pull` (replacing `:latest`).
+
 ### Closed-inference agents + PowerShell network harness (docs)
 
 - **Docs:** [closed-agent-network-harness-contract.md](closed-agent-network-harness-contract.md) (three-plane contract, egress tiers, secrets, bridge vs LAN attach), [closed-agent-provision-tab-wireframe.md](closed-agent-provision-tab-wireframe.md) (new tab + Warm assets + Pre-flight links), [closed-agent-docker-labels.md](closed-agent-docker-labels.md) (container labels and naming), [closed-agent-integration-test-matrix.md](closed-agent-integration-test-matrix.md) (manual checklist), [closed-agent-upstream-submodule-policy.md](closed-agent-upstream-submodule-policy.md) (submodule decision and pin process). Cross-links from [internal-claude-code-codex-devcontainers.md](internal-claude-code-codex-devcontainers.md) and [telvm-network-agent README](../agents/telvm-network-agent/README.md).
