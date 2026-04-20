@@ -24,6 +24,7 @@ $ErrorActionPreference = "Stop"
 $script:Version = "0.1.0"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+. "$ScriptDir\lib\Disk.ps1"
 . "$ScriptDir\lib\Ics.ps1"
 . "$ScriptDir\lib\Inspect.ps1"
 . "$ScriptDir\lib\Discover.ps1"
@@ -124,6 +125,40 @@ function Handle-IcsDiagnostics {
   return Get-NetworkDiagnostics
 }
 
+function Handle-PreflightMetrics {
+  <#
+  .SYNOPSIS
+    JSON for Slackeel Phoenix Pre-flight: disk headroom + network diagnostics (telvm monorepo).
+  #>
+  $diskSummary = Get-PreflightDiskSummary
+  $free = $diskSummary.min_free_bytes
+  $diag = Get-NetworkDiagnostics
+  return @{
+    source   = "telvm-network-agent"
+    version  = $script:Version
+    hostname = $env:COMPUTERNAME
+    utc      = [DateTime]::UtcNow.ToString('o')
+    free_bytes = $free
+    metrics    = @{
+      free_bytes = $free
+    }
+    disk = @{
+      effective_free_bytes = $free
+      method               = "minimum_free_bytes_across_Get-PSDrive_FileSystem_volumes"
+      note                 = "Pre-flight gates on the smallest Free among listed volumes (pull bottleneck), not total free summed across disks."
+      volumes              = $diskSummary.volumes
+    }
+    network = @{
+      hostname     = $diag.hostname
+      utc          = $diag.utc
+      adapters     = $diag.adapters
+      interfaces   = $diag.interfaces
+      routes       = $diag.routes
+      reachability = $diag.reachability
+    }
+  }
+}
+
 # ── main loop ────────────────────────────────────────────────────────────────
 
 if ([string]::IsNullOrEmpty($Token)) {
@@ -164,6 +199,7 @@ try {
 
       switch ("$method $path") {
         "GET /health"           { $body = Handle-Health }
+        "GET /preflight/metrics" { $body = Handle-PreflightMetrics }
         "GET /ics/status"       { $body = Handle-IcsStatus }
         "GET /ics/hosts"        { $body = Handle-IcsHosts }
         "GET /ics/diagnostics"  { $body = Handle-IcsDiagnostics }

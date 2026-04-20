@@ -20,6 +20,12 @@ companion/priv/static/assets/
 # If you run npm/yarn on the host inside companion/assets/
 companion/assets/node_modules/
 
+# Slackeel Phoenix (under slackeel/server/)
+slackeel/server/_build/
+slackeel/server/deps/
+slackeel/server/.elixir_ls/
+slackeel/server/priv/static/assets/
+
 # MCP package (Node / TypeScript)
 mcp/node_modules/
 mcp/dist/

@@ -60,7 +60,7 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 
 **Full runbook** (egress verify, vendor CLI soak, Ollama, tests): [docs/quickstart.md](docs/quickstart.md).
 
-1. **Run:** `git clone https://github.com/telvm-hq/telvm.git && cd telvm && docker compose up --build` — **companion** on **`http://localhost:4000`**, **`speedeel`** on **`http://localhost:4010`**. No **`.env`** required for defaults (**`docker-compose.yml`**). After healthy: **`./scripts/verify-closed-agent-egress.sh`** (or **`scripts/verify-closed-agent-egress.ps1`**) then **`docker compose logs companion`** and filter **`egress_proxy`**. Guides: **[`speedeel/README.md`](speedeel/README.md)** (`TELVM_GUIDES_ROOT` in Compose).
+1. **Run:** `git clone https://github.com/telvm-hq/telvm.git && cd telvm && docker compose up --build` — **companion** on **`http://localhost:4000`**, **`speedeel`** on **`http://localhost:4010`**. No **`.env`** required for defaults (**`docker-compose.yml`**). After healthy: **`./scripts/closed-agent/verify-closed-agent-egress.sh`** (or **`scripts/closed-agent/verify-closed-agent-egress.ps1`**) then **`docker compose logs companion`** and filter **`egress_proxy`**. Guides: **[`speedeel/README.md`](speedeel/README.md)** (`TELVM_GUIDES_ROOT` in Compose).
 
 2. **Operator UI (browser):** [http://localhost:4000](http://localhost:4000) → **Pre-flight**; **Machines** (`/machines`) for labs, **Verify**, **Vendor CLI agents**, **Warm assets** (`/warm`). Vendor CLI walkthrough: [quickstart — Vendor CLI agents (5 min)](docs/quickstart.md#vendor-cli-agents-5-min). **Core loop:** **Verify** a lab → container on **Warm assets** (preview, Explorer, logs; agents: **`GET /telvm/api/machines/:id/logs`**).
 

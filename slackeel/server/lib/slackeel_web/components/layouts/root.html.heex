@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <.live_title default="Slackeel" suffix=" · telvm">
+      {assigns[:page_title]}
+    </.live_title>
+    <link phx-track-static rel="stylesheet" href={~p"/assets/css/app.css"} />
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/js/app.js"}>
+    </script>
+
+    <script>
+      (() => {
+        const setTheme = (theme) => {
+          const t = theme === "dark" ? "dark" : "light";
+          localStorage.setItem("phx:theme", t);
+          document.documentElement.setAttribute("data-theme", t);
+        };
+        if (!document.documentElement.hasAttribute("data-theme")) {
+          const stored = localStorage.getItem("phx:theme");
+          setTheme(stored === "dark" || stored === "light" ? stored : "dark");
+        }
+        window.addEventListener("storage", (e) => e.key === "phx:theme" && setTheme(e.newValue || "dark"));
+
+        window.addEventListener("phx:set-theme", (e) => setTheme(e.target.dataset.phxTheme));
+
+        const setAccent = (accent) => {
+          const v = ["purple", "yellow", "green"].includes(accent) ? accent : "purple";
+          localStorage.setItem("phx:accent", v);
+          document.documentElement.setAttribute("data-accent", v);
+        };
+        if (!document.documentElement.hasAttribute("data-accent")) {
+          setAccent(localStorage.getItem("phx:accent") || "purple");
+        }
+        window.addEventListener("storage", (e) => e.key === "phx:accent" && setAccent(e.newValue || "purple"));
+        window.addEventListener("phx:set-accent", (e) => setAccent(e.target.dataset.phxAccent));
+      })();
+    </script>
+  </head>
+
+  <body class="h-full min-h-screen antialiased">{@inner_content}</body>
+</html>

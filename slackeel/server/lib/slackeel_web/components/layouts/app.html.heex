@@ -1,0 +1,74 @@
+<div class="telvm-app-shell slac-tactical flex h-full min-h-screen flex-col">
+  <header
+    class="telvm-top-nav navbar flex w-full shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-2 py-1.5 sm:px-3 sm:py-2"
+    style="border-color: var(--telvm-shell-border);"
+  >
+    <div class="flex min-w-0 flex-1 items-center">
+      <a
+        href={~p"/preflight"}
+        class="flex min-w-0 items-center gap-1.5 sm:gap-2 transition-colors telvm-accent-text hover:opacity-90 shrink-0"
+      >
+        <img src={~p"/images/logo.svg"} width="28" height="28" class="sm:w-9 sm:h-9 w-7 h-7" alt="" />
+        <span class="text-[11px] sm:text-sm font-semibold tracking-wide uppercase truncate">
+          Slackeel
+        </span>
+      </a>
+    </div>
+
+    <div class="flex-none">
+      <ul class="flex flex-wrap items-center justify-end gap-x-1 gap-y-1 sm:gap-x-2 px-0.5">
+        <li
+          :if={Map.get(assigns, :top_bar_title) && Map.get(assigns, :refreshed_at)}
+          class="mr-0.5 flex max-w-[min(100%,18rem)] flex-col items-end leading-tight sm:mr-1 sm:max-w-none sm:items-center"
+        >
+          <span class="text-[9px] font-bold uppercase tracking-[0.18em] telvm-accent-text sm:text-[10px]">
+            {Map.get(assigns, :top_bar_title)}
+          </span>
+          <time class="font-mono text-[8px] tabular-nums text-[var(--telvm-shell-muted)] sm:text-[9px]">
+            {Calendar.strftime(Map.get(assigns, :refreshed_at), "%Y-%m-%d %H:%M:%S")} UTC
+          </time>
+        </li>
+        <li
+          :if={Map.get(assigns, :snapshot)}
+          class="mr-0.5 hidden min-w-0 max-w-[min(100%,52rem)] shrink overflow-x-auto sm:flex sm:items-center"
+        >
+          <.preflight_nav_strip snapshot={Map.get(assigns, :snapshot)} />
+        </li>
+        <li>
+          <a
+            href={~p"/models"}
+            class="btn btn-ghost btn-xs sm:btn-sm px-2 telvm-nav-tab-idle border border-transparent rounded-sm"
+          >
+            Models
+          </a>
+        </li>
+        <li>
+          <a
+            href={~p"/preflight"}
+            class="btn btn-ghost btn-xs sm:btn-sm px-2 telvm-nav-tab-idle border border-transparent rounded-sm"
+          >
+            Pre-Flight
+          </a>
+        </li>
+        <li class="flex items-center gap-1">
+          <.accent_toggle /> <.theme_toggle />
+        </li>
+      </ul>
+    </div>
+  </header>
+
+  <.ollama_verify_hud
+    show={Map.get(assigns, :show_ollama_hud, false)}
+    verify_running={Map.get(assigns, :verify_running, false)}
+    probe_prompt_draft={Map.get(assigns, :probe_prompt_draft, "")}
+    probe_prompt_locked={Map.get(assigns, :probe_prompt_locked, "")}
+    probe_prompt_needs_commit={Map.get(assigns, :probe_prompt_needs_commit, false)}
+  />
+
+  <main class="flex min-h-0 flex-1 flex-col px-2 py-1 sm:px-3 sm:py-1.5 transition-colors duration-200">
+    <div class="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
+      {@inner_content}
+    </div>
+  </main>
+  <.flash_group flash={@flash} />
+</div>

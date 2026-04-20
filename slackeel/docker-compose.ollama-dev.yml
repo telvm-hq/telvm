@@ -1,0 +1,21 @@
+# Ollama only — for local Phoenix development (mix phx.server on the host with hot reload).
+# Same project name + volume key as docker-compose.yml so model data is shared.
+#
+#   docker compose -f docker-compose.ollama-dev.yml up -d
+#
+# Local mix phx.server uses http://127.0.0.1:4020 (see server/config/dev.exs); Ollama at http://127.0.0.1:11434
+name: slackeel
+
+services:
+  ollama:
+    image: ollama/ollama:0.20.5
+    ports:
+      - "11434:11434"
+    volumes:
+      - slackeel_ollama_data:/root/.ollama
+    environment:
+      CUDA_VISIBLE_DEVICES: "-1"
+      OLLAMA_NUM_PARALLEL: "1"
+
+volumes:
+  slackeel_ollama_data:

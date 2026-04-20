@@ -238,7 +238,7 @@ The [`companion_test`](../docker-compose.yml) service runs `mix deps.get && mix 
 
 **Optional (host):** `cd companion && mix test` when Postgres is on `localhost` and test env vars are unset.
 
-**Optional (integration, egress):** with the default **`docker compose up`** stack running on the host, **`make smoke-closed-egress`** runs [`scripts/verify-closed-agent-egress.sh`](../scripts/verify-closed-agent-egress.sh) (see [quickstart — Tests](quickstart.md#tests)). This exercises real Engine + vendor **`curl`** paths; it is not part of ExUnit.
+**Optional (integration, egress):** with the default **`docker compose up`** stack running on the host, **`make smoke-closed-egress`** runs [`scripts/closed-agent/verify-closed-agent-egress.sh`](../scripts/closed-agent/verify-closed-agent-egress.sh) (see [quickstart — Tests](quickstart.md#tests)). This exercises real Engine + vendor **`curl`** paths; it is not part of ExUnit.
 
 **Ad-hoc:**
 

@@ -1,0 +1,2 @@
+# Enforce LF for shell scripts (avoids BusyBox sh errors when building on Windows).
+*.sh text eol=lf

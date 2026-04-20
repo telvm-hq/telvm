@@ -1,0 +1,573 @@
+/* Telvm dashboard shell — aligned with companion (P/Y/G accent + light/dark). */
+
+/* Paint stack: html + body + shell + main must all use shell tokens, or DaisyUI/base
+   colors show through as “random gray” in gutters and below flex children. */
+html {
+  min-height: 100%;
+  background-color: var(--telvm-shell-bg);
+  color-scheme: dark;
+  --telvm-shell-bg: oklch(15% 0.018 285);
+  --telvm-shell-elevated: oklch(18% 0.02 285);
+  --telvm-shell-fg: oklch(93% 0.02 285);
+  --telvm-shell-muted: oklch(58% 0.02 285);
+  --telvm-shell-border: oklch(32% 0.02 285);
+  --telvm-panel-bg: oklch(14% 0.02 285 / 0.92);
+  --telvm-input-bg: oklch(8% 0.01 285 / 0.45);
+  --telvm-danger: oklch(62% 0.19 22);
+  --telvm-danger-border: oklch(45% 0.14 22);
+  --telvm-danger-bg: oklch(22% 0.06 22 / 0.35);
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --telvm-shell-bg: oklch(99.2% 0.006 285);
+  --telvm-shell-elevated: oklch(100% 0 0);
+  --telvm-shell-fg: oklch(22% 0.02 285);
+  --telvm-shell-muted: oklch(45% 0.02 285);
+  --telvm-shell-border: oklch(91% 0.018 285);
+  --telvm-panel-bg: oklch(99.4% 0.008 285 / 0.96);
+  --telvm-input-bg: oklch(98% 0.01 285 / 0.92);
+  --telvm-danger: oklch(48% 0.18 22);
+  --telvm-danger-border: oklch(72% 0.12 22);
+  --telvm-danger-bg: oklch(95% 0.03 22 / 0.6);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  html:not([data-theme]) {
+    color-scheme: light;
+    --telvm-shell-bg: oklch(99.2% 0.006 285);
+    --telvm-shell-elevated: oklch(100% 0 0);
+    --telvm-shell-fg: oklch(22% 0.02 285);
+    --telvm-shell-muted: oklch(45% 0.02 285);
+    --telvm-shell-border: oklch(91% 0.018 285);
+    --telvm-panel-bg: oklch(99.4% 0.008 285 / 0.96);
+    --telvm-input-bg: oklch(98% 0.01 285 / 0.92);
+    --telvm-danger: oklch(48% 0.18 22);
+    --telvm-danger-border: oklch(72% 0.12 22);
+    --telvm-danger-bg: oklch(95% 0.03 22 / 0.6);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    color-scheme: dark;
+    --telvm-shell-bg: oklch(15% 0.018 285);
+    --telvm-shell-elevated: oklch(18% 0.02 285);
+    --telvm-shell-fg: oklch(93% 0.02 285);
+    --telvm-shell-muted: oklch(58% 0.02 285);
+    --telvm-shell-border: oklch(32% 0.02 285);
+    --telvm-panel-bg: oklch(14% 0.02 285 / 0.92);
+    --telvm-input-bg: oklch(8% 0.01 285 / 0.45);
+    --telvm-danger: oklch(62% 0.19 22);
+    --telvm-danger-border: oklch(45% 0.14 22);
+    --telvm-danger-bg: oklch(22% 0.06 22 / 0.35);
+  }
+}
+
+html[data-accent="purple"],
+html:not([data-accent]) {
+  --telvm-accent: oklch(72% 0.2 303);
+  --telvm-accent-dim: oklch(58% 0.16 303);
+  --telvm-accent-subtle: oklch(78% 0.08 303);
+  --telvm-accent-border: color-mix(in oklch, oklch(72% 0.2 303) 42%, transparent);
+  --telvm-accent-glow: color-mix(in oklch, oklch(72% 0.2 303) 22%, transparent);
+  --telvm-accent-secondary: oklch(68% 0.14 303);
+  --telvm-ok: oklch(76% 0.14 160);
+  --telvm-warn: oklch(78% 0.14 75);
+}
+
+html[data-accent="yellow"] {
+  --telvm-accent: oklch(86% 0.16 95);
+  --telvm-accent-dim: oklch(72% 0.14 95);
+  --telvm-accent-subtle: oklch(88% 0.08 95);
+  --telvm-accent-border: color-mix(in oklch, oklch(86% 0.16 95) 45%, transparent);
+  --telvm-accent-glow: color-mix(in oklch, oklch(86% 0.16 95) 24%, transparent);
+  --telvm-accent-secondary: oklch(78% 0.12 95);
+  --telvm-ok: oklch(72% 0.14 150);
+  --telvm-warn: oklch(82% 0.14 65);
+}
+
+html[data-accent="green"] {
+  --telvm-accent: oklch(76% 0.17 155);
+  --telvm-accent-dim: oklch(62% 0.14 155);
+  --telvm-accent-subtle: oklch(82% 0.08 155);
+  --telvm-accent-border: color-mix(in oklch, oklch(76% 0.17 155) 42%, transparent);
+  --telvm-accent-glow: color-mix(in oklch, oklch(76% 0.17 155) 22%, transparent);
+  --telvm-accent-secondary: oklch(68% 0.12 165);
+  --telvm-ok: oklch(78% 0.12 165);
+  --telvm-warn: oklch(80% 0.14 95);
+}
+
+body {
+  min-height: 100%;
+  background-color: var(--telvm-shell-bg);
+  color: var(--telvm-shell-fg);
+}
+
+.telvm-app-shell {
+  min-height: 100%;
+  width: 100%;
+  background-color: var(--telvm-shell-bg);
+  color: var(--telvm-shell-fg);
+}
+
+/* Do not use DaisyUI’s `navbar` here — it applies bg-base-* and fights this token. */
+.telvm-app-shell > .telvm-top-nav {
+  background-color: var(--telvm-shell-elevated);
+  border-color: var(--telvm-shell-border);
+}
+
+.telvm-app-shell > main {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  background-color: var(--telvm-shell-bg);
+}
+
+/* Terminal root: matches companion StatusLive width / centering */
+.telvm-console-shell {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.telvm-accent-border-b {
+  border-bottom-color: var(--telvm-accent-border);
+}
+
+.telvm-prose-bar {
+  border-left-color: var(--telvm-accent-border);
+}
+
+.telvm-nav-tab-idle {
+  border-color: color-mix(in oklch, var(--telvm-shell-border) 80%, transparent);
+  color: var(--telvm-shell-muted);
+}
+
+.telvm-nav-tab-idle:hover {
+  color: var(--telvm-shell-fg);
+  border-color: var(--telvm-shell-border);
+}
+
+.telvm-accent-text {
+  color: var(--telvm-accent);
+}
+
+.telvm-accent-dim-text {
+  color: var(--telvm-accent-dim);
+}
+
+.telvm-text-warn {
+  color: var(--telvm-warn);
+}
+
+.telvm-panel-border {
+  border-color: var(--telvm-accent-border);
+}
+
+.telvm-panel-bg {
+  background-color: var(--telvm-panel-bg);
+}
+
+.telvm-btn-primary {
+  border: 1px solid color-mix(in oklch, var(--telvm-accent) 55%, transparent);
+  color: var(--telvm-shell-fg);
+  background-color: color-mix(in oklch, var(--telvm-accent) 18%, transparent);
+}
+
+.telvm-btn-primary:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--telvm-accent) 28%, transparent);
+}
+
+.telvm-btn-secondary {
+  border: 1px solid color-mix(in oklch, var(--telvm-accent-secondary) 50%, transparent);
+  color: var(--telvm-accent-subtle);
+  background-color: color-mix(in oklch, var(--telvm-accent-secondary) 12%, transparent);
+}
+
+.telvm-btn-secondary:hover:not(:disabled) {
+  background-color: color-mix(in oklch, var(--telvm-accent-secondary) 22%, transparent);
+}
+
+.telvm-verify-card {
+  border-color: var(--telvm-accent-border);
+  box-shadow: inset 0 1px 0 0 var(--telvm-accent-glow);
+}
+
+.telvm-text-ok {
+  color: var(--telvm-ok);
+}
+
+.telvm-text-danger-ink {
+  color: color-mix(in oklch, var(--telvm-danger) 92%, white);
+}
+
+.telvm-muted-xs {
+  font-size: 10px;
+  color: var(--telvm-shell-muted);
+}
+
+.telvm-term-header {
+  color: var(--telvm-shell-muted);
+  background-color: color-mix(in oklch, var(--telvm-shell-elevated) 65%, transparent);
+  border-bottom: 1px solid color-mix(in oklch, var(--telvm-shell-border) 70%, transparent);
+}
+
+.telvm-terminal {
+  border-radius: 0.125rem;
+  border: 1px solid var(--telvm-shell-border);
+  background-color: var(--telvm-panel-bg);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.375;
+  color: var(--telvm-shell-fg);
+  box-shadow: inset 0 1px 2px color-mix(in oklch, var(--telvm-shell-border) 35%, transparent);
+}
+
+/* Companion-style transcript rows (optional grids) */
+.term-row {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: 0.5rem;
+  row-gap: 0.125rem;
+  align-items: start;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  border-bottom: 1px solid color-mix(in oklch, var(--telvm-shell-border) 55%, transparent);
+}
+
+.telvm-accent-toggle-active {
+  background-color: var(--telvm-accent-glow);
+  color: var(--telvm-accent);
+  border-color: var(--telvm-accent-border);
+}
+
+.telvm-accent-toggle-idle {
+  border-color: transparent;
+  color: var(--telvm-shell-muted);
+}
+
+.telvm-accent-toggle-idle:hover {
+  color: var(--telvm-shell-fg);
+}
+
+.telvm-pill-neutral {
+  border: 1px solid color-mix(in oklch, var(--telvm-shell-border) 70%, transparent);
+}
+
+.telvm-pill-accent {
+  border: 1px solid var(--telvm-accent-border);
+}
+
+.telvm-pill-ok {
+  border: 1px solid color-mix(in oklch, var(--telvm-ok) 45%, transparent);
+}
+
+.telvm-pill-bad {
+  border: 1px solid var(--telvm-danger-border);
+}
+
+/* --- Slackeel tactical (mobile-first, pragmatic / field-panel readout) --- */
+.slac-tactical {
+  font-variant-numeric: tabular-nums;
+}
+
+.slac-tactical header {
+  border-bottom-width: 1px;
+}
+
+.slac-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 0.125rem;
+  border: 1px solid color-mix(in oklch, var(--telvm-shell-border) 85%, transparent);
+  background: var(--telvm-panel-bg);
+  box-shadow: inset 0 1px 0 0 color-mix(in oklch, var(--telvm-shell-border) 25%, transparent);
+}
+
+/* Square tiles: fixed aspect on narrow viewports; scroll inside body */
+.slac-card--square {
+  aspect-ratio: 1 / 1;
+  max-width: 100%;
+}
+
+.slac-card__hdr {
+  flex-shrink: 0;
+  padding: 0.35rem 0.45rem;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--telvm-shell-muted);
+  border-bottom: 1px solid color-mix(in oklch, var(--telvm-shell-border) 75%, transparent);
+  background: color-mix(in oklch, var(--telvm-shell-elevated) 55%, transparent);
+}
+
+.slac-card__body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.45rem 0.5rem;
+  -webkit-overflow-scrolling: touch;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+@media (min-width: 640px) {
+  .slac-card__body {
+    font-size: 0.8125rem;
+  }
+}
+
+/* Full-width data panels: capped height, scroll inside */
+.slac-card--panel {
+  grid-column: 1 / -1;
+  aspect-ratio: auto;
+  min-height: 10rem;
+  max-height: min(70vh, 28rem);
+}
+
+.slac-card--panel .slac-card__body {
+  overflow: auto;
+}
+
+/* Ollama verify HUD: not the tall panel tile */
+.slac-card--cockpit {
+  aspect-ratio: auto;
+  min-height: 0;
+  max-height: none;
+}
+
+.slac-card--cockpit .slac-card__body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Models: manifest fills remaining viewport under KPI strip */
+.slac-card--models-manifest {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: auto;
+}
+
+.slac-card--models-manifest .slac-card__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Pre-flight LiveView root: stretch inside app main */
+.slac-preflight-view {
+  min-height: 0;
+}
+
+.slac-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--telvm-shell-border) 70%, transparent);
+}
+
+.slac-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (min-width: 1024px) {
+  .slac-grid {
+    gap: 0.75rem;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .slac-span-2 {
+    grid-column: span 2;
+  }
+}
+
+/* Preflight: structured verify log (LiveView + ScrollProbeLog hook) */
+.telvm-probe-console {
+  background: var(--telvm-input-bg);
+  box-shadow: inset 0 1px 2px color-mix(in oklch, var(--telvm-shell-border) 35%, transparent);
+}
+
+.telvm-probe-console__hdr {
+  background: color-mix(in oklch, var(--telvm-shell-elevated) 40%, transparent);
+}
+
+.telvm-probe-console__body {
+  color: var(--telvm-shell-fg);
+}
+
+/* Pre-flight: narrow cockpit + mission board (fighter-jet HUD) */
+.slac-cockpit-wrap {
+  width: 100%;
+  max-width: 36rem; /* ~576px — focused console */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Pre-flight / chat room: wider readable column */
+.slac-cockpit-wrap--preflight {
+  max-width: min(56rem, 100%);
+}
+
+@media (min-width: 640px) {
+  .slac-cockpit-wrap {
+    max-width: 40rem;
+  }
+
+  .slac-cockpit-wrap--preflight {
+    max-width: min(60rem, 100%);
+  }
+}
+
+.slac-preflight-disk-grid {
+  width: 100%;
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.telvm-mission-board {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0.125rem;
+  border: 1px solid color-mix(in oklch, var(--telvm-shell-border) 85%, transparent);
+  background: color-mix(in oklch, var(--telvm-shell-bg) 92%, transparent);
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in oklch, var(--telvm-shell-border) 25%, transparent),
+    0 0 24px -8px color-mix(in oklch, var(--telvm-shell-border) 40%, transparent);
+}
+
+/* Fills flex parent — was capped at 18rem and hid the board on first paint */
+.telvm-mission-board__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.telvm-mission-board__hdr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto) auto;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--telvm-shell-muted);
+  border-bottom: 1px solid color-mix(in oklch, var(--telvm-shell-border) 75%, transparent);
+  background: color-mix(in oklch, var(--telvm-shell-elevated) 50%, transparent);
+}
+
+.telvm-mission-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, auto) auto;
+  gap: 0.35rem 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.5rem;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  line-height: 1.25;
+  border-bottom: 1px solid color-mix(in oklch, var(--telvm-shell-border) 45%, transparent);
+  transition:
+    background 0.2s ease,
+    box-shadow 0.25s ease;
+}
+
+.telvm-mission-row:last-child {
+  border-bottom: none;
+}
+
+.telvm-mission-row--current {
+  background: color-mix(in oklch, var(--telvm-shell-elevated) 70%, transparent);
+  box-shadow:
+    inset 3px 0 0 0 color-mix(in oklch, oklch(72% 0.19 290) 75%, transparent),
+    inset 0 0 0 1px color-mix(in oklch, oklch(72% 0.19 290) 35%, transparent);
+  animation: telvm-mission-hud-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes telvm-mission-hud-pulse {
+  0%,
+  100% {
+    box-shadow:
+      inset 3px 0 0 0 color-mix(in oklch, oklch(72% 0.19 290) 55%, transparent),
+      inset 0 0 0 1px color-mix(in oklch, oklch(72% 0.19 290) 22%, transparent);
+  }
+  50% {
+    box-shadow:
+      inset 3px 0 0 0 color-mix(in oklch, oklch(78% 0.22 290) 85%, transparent),
+      inset 0 0 12px -2px color-mix(in oklch, oklch(72% 0.19 290) 45%, transparent);
+  }
+}
+
+.telvm-mission-model {
+  min-width: 0;
+  word-break: break-all;
+  color: var(--telvm-shell-fg);
+}
+
+.telvm-mission-phase {
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  min-width: 2rem;
+}
+
+.telvm-cockpit-hud-line {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, oklch(72% 0.19 290) 45%, transparent) 20%,
+    color-mix(in oklch, oklch(72% 0.19 290) 45%, transparent) 80%,
+    transparent
+  );
+  margin: 0.5rem 0;
+}
+
+/* Models page: live tok/s row highlight */
+@keyframes telvm-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes telvm-metric-row-flash {
+  0% {
+    background-color: color-mix(in oklch, var(--telvm-accent) 24%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.telvm-models-row--metric-flash td {
+  animation: telvm-metric-row-flash 0.85s ease-out;
+}
