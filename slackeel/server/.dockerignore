@@ -1,0 +1,9 @@
+_build
+deps
+.elixir_ls
+.git
+.gitignore
+*.md
+tmp
+erl_crash.dump
+assets/node_modules

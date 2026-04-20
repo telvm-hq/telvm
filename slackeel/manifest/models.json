@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "description": "Advertised Ollama model names for Slackeel. Align with docs/MODEL_CATALOG.md when changing.",
+  "ollama_compose_image": "ollama/ollama:0.20.5",
+  "models": [
+    { "id": "qwen-0500m", "family": "Qwen", "ollama": "qwen2.5:0.5b", "required": true },
+    { "id": "qwen-1.5b", "family": "Qwen", "ollama": "qwen2.5:1.5b", "required": false },
+    { "id": "llama321b", "family": "Llama", "ollama": "llama3.2:1b", "required": false },
+    { "id": "llama323b", "family": "Llama", "ollama": "llama3.2:3b", "required": false },
+    { "id": "gemma22b", "family": "Gemma", "ollama": "gemma2:2b", "required": false },
+    { "id": "phi3-mini", "family": "Phi", "ollama": "phi3:mini", "required": false },
+    { "id": "phi38b-alt", "family": "Phi", "ollama": "phi3:3.8b", "required": false },
+    { "id": "ministral-3b", "family": "Mistral", "ollama": "ministral-3:3b", "required": false },
+    { "id": "mistral-7b", "family": "Mistral", "ollama": "mistral:7b", "required": false },
+    { "id": "tinyllama", "family": "Baseline", "ollama": "tinyllama", "required": false }
+  ]
+}
