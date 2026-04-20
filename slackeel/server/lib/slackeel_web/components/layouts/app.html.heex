@@ -15,11 +15,12 @@
       </a>
     </div>
 
-    <div class="flex-none">
-      <ul class="flex flex-wrap items-center justify-end gap-x-1 gap-y-1 sm:gap-x-2 px-0.5">
+    <%!-- min-w-0 + overflow-x-auto: wide preflight strip cannot clip Models / Receipts / Pre-Flight — scroll sideways if needed --%>
+    <div class="flex min-w-0 max-w-full flex-none justify-end overflow-x-auto [-webkit-overflow-scrolling:touch]">
+      <ul class="flex flex-nowrap items-center justify-end gap-x-1 gap-y-1 sm:gap-x-2 px-0.5">
         <li
           :if={Map.get(assigns, :top_bar_title) && Map.get(assigns, :refreshed_at)}
-          class="mr-0.5 flex max-w-[min(100%,18rem)] flex-col items-end leading-tight sm:mr-1 sm:max-w-none sm:items-center"
+          class="mr-0.5 flex max-w-[min(100%,18rem)] shrink-0 flex-col items-end leading-tight sm:mr-1 sm:max-w-none sm:items-center"
         >
           <span class="text-[9px] font-bold uppercase tracking-[0.18em] telvm-accent-text sm:text-[10px]">
             {Map.get(assigns, :top_bar_title)}
@@ -34,7 +35,7 @@
         >
           <.preflight_nav_strip snapshot={Map.get(assigns, :snapshot)} />
         </li>
-        <li>
+        <li class="shrink-0">
           <a
             href={~p"/models"}
             class="btn btn-ghost btn-xs sm:btn-sm px-2 telvm-nav-tab-idle border border-transparent rounded-sm"
@@ -42,7 +43,15 @@
             Models
           </a>
         </li>
-        <li>
+        <li class="shrink-0">
+          <a
+            href={~p"/receipts"}
+            class="btn btn-ghost btn-xs sm:btn-sm px-2 telvm-nav-tab-idle border border-transparent rounded-sm"
+          >
+            Receipts
+          </a>
+        </li>
+        <li class="shrink-0">
           <a
             href={~p"/preflight"}
             class="btn btn-ghost btn-xs sm:btn-sm px-2 telvm-nav-tab-idle border border-transparent rounded-sm"
@@ -50,7 +59,7 @@
             Pre-Flight
           </a>
         </li>
-        <li class="flex items-center gap-1">
+        <li class="flex shrink-0 items-center gap-1">
           <.accent_toggle /> <.theme_toggle />
         </li>
       </ul>
