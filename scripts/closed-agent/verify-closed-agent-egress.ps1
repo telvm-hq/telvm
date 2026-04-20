@@ -1,7 +1,7 @@
 # Verify HTTPS via Telvm egress proxy from closed-agent containers (Windows-friendly).
 # Prereq: repo root, docker compose up --build.
 $ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $PSScriptRoot
+$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $Root
 
 Write-Host "telvm: verify closed-agent egress via companion proxy"

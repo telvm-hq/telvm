@@ -6,11 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Scripts layout
+
+- Reorganized [`scripts/`](../scripts/README.md): **`ollama/`** (smoke tests), **`closed-agent/`** (egress verify), **`docker/`** (diagnostics); existing **`lan-host/`** and **`windows/`** unchanged.
+
 ### Ollama utility (docs + smoke)
 
 - **Docs:** [utilities-ollama.md](utilities-ollama.md) — utility (not closed-agent): pin cadence, **`GET /v1/models`** + **`POST /v1/chat/completions`** smoke; **five-family** model catalog (Qwen, Llama, Gemma, **Phi (Microsoft)**, Mistral).
-- **Scripts:** [`scripts/smoke-ollama.sh`](../scripts/smoke-ollama.sh), [`scripts/smoke-ollama.ps1`](../scripts/smoke-ollama.ps1).
+- **Scripts:** [`scripts/ollama/smoke-ollama.sh`](../scripts/ollama/smoke-ollama.sh), [`scripts/ollama/smoke-ollama.ps1`](../scripts/ollama/smoke-ollama.ps1) (see [`scripts/README.md`](../scripts/README.md)).
 - **Compose:** [`docker-compose.yml`](../docker-compose.yml) pins **`ollama/ollama:0.20.5`** for `ollama` and `ollama_pull` (replacing `:latest`).
+- **Slackeel (subtree / future extract):** [`slackeel/`](../slackeel/) includes a **self-contained** Ollama stack ([`slackeel/docker-compose.yml`](../slackeel/docker-compose.yml), [`slackeel/docs/OLLAMA.md`](../slackeel/docs/OLLAMA.md), [`slackeel/scripts/ollama/`](../slackeel/scripts/ollama/)) so developers can clone Slackeel alone without Telvm.
 
 ### Closed-inference agents + PowerShell network harness (docs)
 

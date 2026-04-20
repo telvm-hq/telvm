@@ -3,7 +3,7 @@
 # Prereq: docker compose up --build (companion healthy; telvm_closed_* running).
 # See docs/closed-agent-network-harness-contract.md — lab_relaxed may still allow direct egress for processes that ignore HTTP_PROXY.
 set -e
-ROOT=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+ROOT=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$ROOT"
 
 echo "telvm: verify closed-agent egress via companion proxy"

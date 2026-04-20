@@ -35,11 +35,11 @@ A separate **static list** poller (**`Companion.ClusterNodePoller`**) exists in 
 From the repo root, after **`docker compose up --build`** reports **companion** healthy:
 
 ```bash
-./scripts/verify-closed-agent-egress.sh
+./scripts/closed-agent/verify-closed-agent-egress.sh
 docker compose logs companion 2>&1 | grep egress_proxy
 ```
 
-On Windows (PowerShell): **`./scripts/verify-closed-agent-egress.ps1`**, then filter logs with **`Select-String egress_proxy`**. Allowed **CONNECT** lines look like **`egress_proxy CONNECT allowed workload=closed_claude target=api.anthropic.com:443`**. The verify script also runs **`apt-get update`** inside each closed container so package index fetches must succeed through the proxy; **`TELVM_EGRESS_WORKLOADS`** therefore includes **`deb.debian.org`**, **`security.debian.org`**, and **`.debian.org`** alongside vendor hosts. If your **`sources.list`** points at other mirror hostnames, add them to the allowlist. **lab_relaxed** images may still allow tools that ignore **`HTTP_PROXY`** to use direct egress — see [closed-agent-network-harness-contract.md](closed-agent-network-harness-contract.md).
+On Windows (PowerShell): **`./scripts/closed-agent/verify-closed-agent-egress.ps1`**, then filter logs with **`Select-String egress_proxy`**. Allowed **CONNECT** lines look like **`egress_proxy CONNECT allowed workload=closed_claude target=api.anthropic.com:443`**. The verify script also runs **`apt-get update`** inside each closed container so package index fetches must succeed through the proxy; **`TELVM_EGRESS_WORKLOADS`** therefore includes **`deb.debian.org`**, **`security.debian.org`**, and **`.debian.org`** alongside vendor hosts. If your **`sources.list`** points at other mirror hostnames, add them to the allowlist. **lab_relaxed** images may still allow tools that ignore **`HTTP_PROXY`** to use direct egress — see [closed-agent-network-harness-contract.md](closed-agent-network-harness-contract.md).
 
 ### Vendor CLI agents (5 min)
 
@@ -58,7 +58,7 @@ Goal: after **`docker compose up --build`**, a new clone can **pull** the publis
 
 Work through these in order:
 
-1. **Host script (canonical):** from repo root, run **`./scripts/verify-closed-agent-egress.sh`** (or **`scripts/verify-closed-agent-egress.ps1`**). If the script fails but the UI passed (or the reverse), compare environments (same Engine, same Compose project).
+1. **Host script (canonical):** from repo root, run **`./scripts/closed-agent/verify-closed-agent-egress.sh`** (or **`scripts/closed-agent/verify-closed-agent-egress.ps1`**). If the script fails but the UI passed (or the reverse), compare environments (same Engine, same Compose project).
 2. **Companion logs:** `docker compose logs companion 2>&1 | grep egress_proxy` (Windows: **`findstr egress_proxy`**). Look for **deny** lines vs **CONNECT allowed** for `api.anthropic.com` / `api.openai.com`.
 3. **Pre-flight card:** on **`/health`**, open **recent denies** under egress — if a hostname is blocked, extend **`TELVM_EGRESS_WORKLOADS`** `allow_hosts` in **`docker-compose.yml`** (then `docker compose up -d companion`).
 4. **Isolate bridge DNS vs listener:** from the **companion** container, a direct probe uses **`127.0.0.1`** instead of the hostname **`companion`**:  
@@ -72,7 +72,7 @@ Compose runs **[Ollama](https://ollama.com/)** with a named volume for weights (
 
 After `docker compose up --build` settles, open **[http://localhost:4000/oss-agents](http://localhost:4000/oss-agents)** (legacy **`/agent`** redirects here). The page **auto-probes** Ollama (OpenAI-compatible `GET /v1/models`), lists models, and when possible **starts the Model tab chat** with **`TELVM_AGENT_DEFAULT_MODEL`** (default **`qwen2.5:0.5b`**). The **Goose agent** tab is the default for in-container chat. Use **Refresh models** to re-fetch after changing the base URL. The companion uses **`TELVM_INFERENCE_BASE_URL=http://ollama:11434/v1`** on the Compose network.
 
-**Maintainers:** Ollama is a **utility** (pinned image, quarterly/CVE bump process) — [utilities-ollama.md](utilities-ollama.md). Quick HTTP smoke from repo root: **`./scripts/smoke-ollama.sh`** or **`./scripts/smoke-ollama.ps1`** (after weights are pulled).
+**Maintainers:** Ollama is a **utility** (pinned image, quarterly/CVE bump process) — [utilities-ollama.md](utilities-ollama.md). Quick HTTP smoke from repo root: **`./scripts/ollama/smoke-ollama.sh`** or **`./scripts/ollama/smoke-ollama.ps1`** (after weights are pulled).
 
 Optional manual smoke on the host (sequential, one model at a time):
 
@@ -125,7 +125,7 @@ This uses the `test` Compose profile, starts Postgres if needed, sets `MIX_ENV=t
 make smoke-closed-egress
 ```
 
-This runs **`scripts/verify-closed-agent-egress.sh`** (same checks as the UI Basic soak path). On Windows without `make`, run the **`.ps1`** script directly (see [Closed-agent egress](#closed-agent-egress-verify) above).
+This runs **`scripts/closed-agent/verify-closed-agent-egress.sh`** (same checks as the UI Basic soak path). On Windows without `make`, run the **`.ps1`** script directly (see [Closed-agent egress](#closed-agent-egress-verify) above).
 
 ### Environment
 

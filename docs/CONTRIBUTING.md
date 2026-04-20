@@ -26,7 +26,7 @@ CI workflows that build those images use **`actions/checkout` with `submodules: 
 
 ### Ollama (utility runtime — not closed-agent)
 
-**Ollama** is a **local inference utility** (pinned Docker image in Compose, OpenAI-compatible HTTP). It is **not** governed by the closed-agent submodule policy. Maintainers: update cadence, image pin, and **`GET /v1/models` + `POST /v1/chat/completions`** smoke — [utilities-ollama.md](utilities-ollama.md) (`scripts/smoke-ollama.sh`, `scripts/smoke-ollama.ps1`).
+**Ollama** is a **local inference utility** (pinned Docker image in Compose, OpenAI-compatible HTTP). It is **not** governed by the closed-agent submodule policy. Maintainers: update cadence, image pin, and **`GET /v1/models` + `POST /v1/chat/completions`** smoke — [utilities-ollama.md](utilities-ollama.md) (`scripts/ollama/smoke-ollama.sh`, `scripts/ollama/smoke-ollama.ps1`; layout in [`scripts/README.md`](../scripts/README.md)).
 
 ## Before you open a PR
 

@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   From the repo root (or anywhere — script locates repo via its own path):
-    .\scripts\docker-diagnostics.ps1
+    .\scripts\docker\docker-diagnostics.ps1
 
   Prints:
     - docker compose ps -a
@@ -19,7 +19,7 @@
 #>
 
 $ErrorActionPreference = "Continue"
-$RepoRoot = Split-Path -Parent $PSScriptRoot
+$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $RepoRoot
 
 function Write-Section($title) {
