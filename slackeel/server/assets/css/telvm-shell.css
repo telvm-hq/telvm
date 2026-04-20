@@ -547,3 +547,27 @@ body {
   );
   margin: 0.5rem 0;
 }
+
+/* Models page: live tok/s row highlight */
+@keyframes telvm-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes telvm-metric-row-flash {
+  0% {
+    background-color: color-mix(in oklch, var(--telvm-accent) 24%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.telvm-models-row--metric-flash td {
+  animation: telvm-metric-row-flash 0.85s ease-out;
+}

@@ -3,20 +3,15 @@ defmodule SlackeelWeb.PreflightLive do
 
   alias Slackeel.Ollama.VerifyPipeline
 
-  @verify_log_max 400
-
   @impl true
   def mount(_params, _session, socket) do
     socket =
       socket
       |> assign(:verify_running, false)
       |> assign(:verify_results, %{})
-      |> assign(:verify_log, [])
-      |> assign(:verify_log_seq, 0)
       |> assign(:verify_started_at, nil)
       |> assign(:verify_cancel_agent, nil)
       |> assign(:show_ollama_hud, true)
-      |> assign(:output_tab, :replies)
       |> assign(:main_view_tab, :mission)
       |> assign_probe_defaults()
 
@@ -24,18 +19,6 @@ defmodule SlackeelWeb.PreflightLive do
   end
 
   @impl true
-  def handle_event("set_output_tab", %{"tab" => "telemetry"}, socket) do
-    {:noreply, assign(socket, :output_tab, :telemetry)}
-  end
-
-  def handle_event("set_output_tab", %{"tab" => "replies"}, socket) do
-    {:noreply, assign(socket, :output_tab, :replies)}
-  end
-
-  def handle_event("set_output_tab", _, socket) do
-    {:noreply, socket}
-  end
-
   def handle_event("set_main_view_tab", %{"tab" => "chat"}, socket) do
     {:noreply, assign(socket, :main_view_tab, :chat)}
   end
@@ -178,17 +161,13 @@ defmodule SlackeelWeb.PreflightLive do
         end)
 
         started_at = DateTime.utc_now()
-        start_line = "[#{Calendar.strftime(started_at, "%H:%M:%S")}] · verify started (#{length(models)} model(s))"
 
         {:noreply,
          socket
          |> assign(:verify_running, true)
          |> assign(:verify_cancel_agent, cancel_agent)
          |> assign(:verify_results, pending)
-         |> assign(:verify_log, [])
-         |> assign(:verify_log_seq, 0)
-         |> assign(:verify_started_at, started_at)
-         |> append_verify_log_line(start_line)}
+         |> assign(:verify_started_at, started_at)}
     end
   end
 
@@ -315,24 +294,11 @@ defmodule SlackeelWeb.PreflightLive do
     {:noreply, mark_overall(socket, model, :error)}
   end
 
-  def handle_info({:verify_event, {:log, line}}, socket) do
-    {:noreply, append_verify_log_line(socket, line)}
+  def handle_info({:verify_event, {:log, _line}}, socket) do
+    {:noreply, socket}
   end
 
   def handle_info(:verify_complete, socket) do
-    started = socket.assigns[:verify_started_at]
-
-    duration_s =
-      case started do
-        %DateTime{} = t -> DateTime.diff(DateTime.utc_now(), t, :second)
-        _ -> nil
-      end
-
-    suffix = if duration_s, do: " (#{duration_s}s)", else: ""
-
-    done_line =
-      "[#{DateTime.utc_now() |> Calendar.strftime("%H:%M:%S")}] · verify complete#{suffix}"
-
     socket =
       socket
       |> stop_verify_cancel_agent()
@@ -340,7 +306,7 @@ defmodule SlackeelWeb.PreflightLive do
       |> assign(:verify_started_at, nil)
       |> assign(:verify_cancel_agent, nil)
 
-    {:noreply, append_verify_log_line(socket, done_line)}
+    {:noreply, socket}
   end
 
   defp stop_verify_cancel_agent(socket) do
@@ -376,27 +342,6 @@ defmodule SlackeelWeb.PreflightLive do
     assign(socket, :verify_results, Map.put(results, model, row))
   end
 
-  defp append_verify_log_line(socket, text) when is_binary(text) do
-    seq = (socket.assigns[:verify_log_seq] || 0) + 1
-    log = socket.assigns[:verify_log] || []
-    entry = %{id: seq, text: text}
-    trimmed = trim_verify_log(log ++ [entry], @verify_log_max)
-
-    socket
-    |> assign(:verify_log, trimmed)
-    |> assign(:verify_log_seq, seq)
-  end
-
-  defp trim_verify_log(list, max) when length(list) <= max, do: list
-
-  defp trim_verify_log(list, max) do
-    Enum.drop(list, length(list) - max)
-  end
-
-  defp verify_log_plain_text(log) when is_list(log) do
-    log |> Enum.map(& &1.text) |> Enum.join("\n")
-  end
-
   defp mark_overall(socket, model, :error) do
     results = socket.assigns.verify_results
 
@@ -419,11 +364,8 @@ defmodule SlackeelWeb.PreflightLive do
   defp load(socket) do
     vr = socket.assigns[:verify_results] || %{}
     vw = socket.assigns[:verify_running] || false
-    vlog = socket.assigns[:verify_log] || []
-    vseq = socket.assigns[:verify_log_seq] || 0
     vst = socket.assigns[:verify_started_at]
 
-    output_tab = Map.get(socket.assigns, :output_tab, :replies)
     main_view_tab = Map.get(socket.assigns, :main_view_tab, :mission)
     vca = socket.assigns[:verify_cancel_agent]
 
@@ -453,12 +395,9 @@ defmodule SlackeelWeb.PreflightLive do
           refreshed_at: DateTime.utc_now(),
           verify_results: vr,
           verify_running: vw,
-          verify_log: vlog,
-          verify_log_seq: vseq,
           verify_started_at: vst,
           verify_cancel_agent: vca,
           show_ollama_hud: true,
-          output_tab: output_tab,
           main_view_tab: main_view_tab,
           probe_prompt_draft: draft,
           probe_prompt_locked: locked,
@@ -474,12 +413,9 @@ defmodule SlackeelWeb.PreflightLive do
           refreshed_at: DateTime.utc_now(),
           verify_results: vr,
           verify_running: vw,
-          verify_log: vlog,
-          verify_log_seq: vseq,
           verify_started_at: vst,
           verify_cancel_agent: vca,
           show_ollama_hud: true,
-          output_tab: output_tab,
           main_view_tab: main_view_tab,
           probe_prompt_draft: draft,
           probe_prompt_locked: locked,
@@ -647,116 +583,6 @@ defmodule SlackeelWeb.PreflightLive do
                   </div>
                 </div>
               </div>
-
-              <div class="telvm-preflight-output-dock flex max-h-[min(34vh,16rem)] min-h-0 shrink-0 flex-col overflow-hidden rounded-sm border border-[color:var(--telvm-shell-border)] sm:max-h-[min(36vh,18rem)]">
-                <div class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[color:var(--telvm-shell-border)] px-2 py-1">
-                  <span class="text-[9px] uppercase tracking-wide text-[var(--telvm-shell-muted)]">sidecar</span>
-                  <div
-                    class="inline-flex overflow-hidden rounded border text-[10px]"
-                    role="tablist"
-                    style="border-color: var(--telvm-shell-border);"
-                  >
-                    <button
-                      type="button"
-                      role="tab"
-                      phx-click="set_output_tab"
-                      phx-value-tab="replies"
-                      aria-selected={@output_tab == :replies}
-                      class={preflight_output_tab_btn_class(@output_tab == :replies)}
-                    >
-                      digest
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      phx-click="set_output_tab"
-                      phx-value-tab="telemetry"
-                      aria-selected={@output_tab == :telemetry}
-                      class={preflight_output_tab_btn_class(@output_tab == :telemetry)}
-                    >
-                      runner
-                    </button>
-                  </div>
-                </div>
-
-                <div class="relative min-h-0 flex-1">
-                  <div
-                    id="preflight-replies-panel"
-                    class={[
-                      "absolute inset-0 flex min-h-0 flex-col overflow-hidden",
-                      @output_tab != :replies && "hidden"
-                    ]}
-                    role="tabpanel"
-                  >
-                    <div class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-                      <p
-                        :if={telemetry_models(@snapshot.models, @verify_results) == []}
-                        class="text-center text-[10px] leading-relaxed text-[var(--telvm-shell-muted)] sm:text-[11px]"
-                      >
-                        No finished replies yet — run
-                        <span class="font-semibold text-[var(--telvm-shell-fg)]">check</span>
-                        in the bar above.
-                      </p>
-                      <div :if={telemetry_models(@snapshot.models, @verify_results) != []} class="space-y-2">
-                        <div
-                          :for={m <- telemetry_models(@snapshot.models, @verify_results)}
-                          class="rounded-sm border border-[color:var(--telvm-shell-border)] px-2 py-1.5"
-                          style="background: color-mix(in oklch, var(--telvm-shell-elevated) 38%, transparent);"
-                        >
-                          <div class="font-mono text-[9px] telvm-accent-dim-text break-all sm:text-[10px]">{m.ollama}</div>
-                          <p :if={r = @verify_results[m.ollama]} class="mt-1 text-[10px] leading-relaxed sm:text-[11px]">
-                            <span :if={r.error} class="telvm-text-danger-ink whitespace-pre-wrap break-words">{r.error}</span>
-                            <pre
-                              :if={r.reply}
-                              class="telvm-terminal mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap rounded-sm p-1.5 text-[10px] leading-relaxed sm:text-xs"
-                            >{r.reply}</pre>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    id="preflight-probe-log"
-                    phx-hook="ScrollProbeLog"
-                    class={[
-                      "telvm-probe-console absolute inset-0 flex min-h-0 flex-col overflow-hidden",
-                      @output_tab != :telemetry && "hidden"
-                    ]}
-                    role="tabpanel"
-                  >
-                    <div class="telvm-probe-console__hdr flex shrink-0 flex-wrap items-center justify-between gap-1 border-b border-[color:var(--telvm-shell-border)] px-2 py-1">
-                      <div class="min-w-0 flex flex-wrap items-baseline gap-x-2 gap-y-0">
-                        <span class="text-[9px] font-semibold uppercase tracking-wide text-[var(--telvm-shell-muted)]">
-                          Runner
-                        </span>
-                        <span :if={@verify_started_at} class="font-mono text-[9px] text-[var(--telvm-shell-muted)]">
-                          {Calendar.strftime(@verify_started_at, "%H:%M:%S")}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        class="shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide telvm-btn-secondary"
-                        onclick="if(navigator.clipboard){const el=document.getElementById('probe-log-plain');navigator.clipboard.writeText(el?el.textContent:'')}"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                    <div
-                      data-probe-log-scroll
-                      class="telvm-probe-console__body min-h-0 flex-1 overflow-y-auto px-2 py-1 font-mono text-[10px] leading-snug"
-                    >
-                      <p :if={@verify_log == []} class="text-[9px] italic text-[var(--telvm-shell-muted)]">
-                        Runner lines appear while a check is in flight.
-                      </p>
-                      <div :for={entry <- @verify_log} id={"verify-log-#{entry.id}"} class="whitespace-pre-wrap break-words">
-                        {entry.text}
-                      </div>
-                    </div>
-                    <pre id="probe-log-plain" class="hidden">{verify_log_plain_text(@verify_log)}</pre>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </section>
@@ -844,14 +670,6 @@ defmodule SlackeelWeb.PreflightLive do
     do:
       "px-3 py-1.5 font-semibold uppercase tracking-wide rounded-none first:rounded-l last:rounded-r border-0 bg-[color-mix(in_oklch,var(--telvm-shell-bg)_40%,transparent)] text-[var(--telvm-shell-muted)] hover:text-[var(--telvm-shell-fg)] outline-none focus-visible:ring-1"
 
-  defp preflight_output_tab_btn_class(true),
-    do:
-      "px-2.5 py-1 font-semibold uppercase tracking-wide telvm-btn-primary border-0 rounded-none first:rounded-l last:rounded-r outline-none focus-visible:ring-1 focus-visible:ring-offset-0 sm:px-3"
-
-  defp preflight_output_tab_btn_class(false),
-    do:
-      "px-2.5 py-1 font-semibold uppercase tracking-wide rounded-none first:rounded-l last:rounded-r border-0 bg-[color-mix(in_oklch,var(--telvm-shell-bg)_40%,transparent)] text-[var(--telvm-shell-muted)] hover:text-[var(--telvm-shell-fg)] outline-none focus-visible:ring-1 sm:px-3"
-
   defp verify_row_for(results, ollama) when is_map(results) and is_binary(ollama) do
     Map.get(results, ollama, %{
       overall: :standby,
@@ -873,15 +691,6 @@ defmodule SlackeelWeb.PreflightLive do
     do: "telvm-mission-row telvm-mission-row--current"
 
   defp mission_row_classes(_), do: "telvm-mission-row"
-
-  defp telemetry_models(models, results) when is_list(models) do
-    Enum.filter(models, fn m ->
-      case results[m.ollama] do
-        nil -> false
-        r -> (r.reply != nil and r.reply != "") or (r.error != nil and r.error != "")
-      end
-    end)
-  end
 
   defp phase_label(:none), do: "—"
   defp phase_label(:running), do: "…"

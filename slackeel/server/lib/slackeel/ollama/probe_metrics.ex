@@ -2,7 +2,12 @@ defmodule Slackeel.Ollama.ProbeMetrics do
   @moduledoc false
   # Ephemeral table: last successful integration probe stats per model (RAM, one node).
 
+  @pubsub_topic "slackeel:probe_metrics"
+
   @table :slackeel_probe_metrics
+
+  @doc false
+  def pubsub_topic, do: @pubsub_topic
 
   @spec init_table() :: :ok
   def init_table do
@@ -24,6 +29,9 @@ defmodule Slackeel.Ollama.ProbeMetrics do
       })
 
     :ets.insert(@table, {model, row})
+
+    Phoenix.PubSub.broadcast(Slackeel.PubSub, @pubsub_topic, {:probe_metric, model, row})
+
     :ok
   end
 

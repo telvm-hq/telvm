@@ -7,15 +7,46 @@ defmodule SlackeelWeb.ModelsLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, load(socket)}
+    socket =
+      load(socket)
+      |> assign(:metrics_live, false)
+      |> assign(:highlight_ollama, nil)
+
+    socket =
+      if connected?(socket) do
+        Phoenix.PubSub.subscribe(Slackeel.PubSub, Slackeel.Ollama.ProbeMetrics.pubsub_topic())
+        assign(socket, :metrics_live, true)
+      else
+        socket
+      end
+
+    {:ok, socket}
   end
 
   @impl true
-  def handle_event("refresh", _params, socket) do
-    {:noreply, load(socket)}
+  def handle_info({:probe_metric, model, row}, socket) when is_binary(model) and is_map(row) do
+    probe_metrics = Map.put(socket.assigns.probe_metrics, model, row)
+    _ = Process.send_after(self(), {:clear_metric_highlight, model}, 850)
+
+    {:noreply,
+     socket
+     |> assign(:probe_metrics, probe_metrics)
+     |> assign(:refreshed_at, DateTime.utc_now())
+     |> assign(:highlight_ollama, model)}
+  end
+
+  def handle_info({:clear_metric_highlight, model}, socket) when is_binary(model) do
+    if socket.assigns[:highlight_ollama] == model do
+      {:noreply, assign(socket, :highlight_ollama, nil)}
+    else
+      {:noreply, socket}
+    end
   end
 
   defp load(socket) do
+    metrics_live = Map.get(socket.assigns, :metrics_live, false)
+    highlight_ollama = Map.get(socket.assigns, :highlight_ollama, nil)
+
     case Slackeel.Preflight.snapshot() do
       {:ok, snap} ->
         assign(socket,
@@ -26,7 +57,9 @@ defmodule SlackeelWeb.ModelsLive do
           refreshed_at: DateTime.utc_now(),
           show_ollama_hud: false,
           verify_running: false,
-          probe_metrics: Slackeel.Ollama.ProbeMetrics.all_map()
+          probe_metrics: Slackeel.Ollama.ProbeMetrics.all_map(),
+          metrics_live: metrics_live,
+          highlight_ollama: highlight_ollama
         )
 
       {:error, reason} ->
@@ -38,7 +71,9 @@ defmodule SlackeelWeb.ModelsLive do
           refreshed_at: DateTime.utc_now(),
           show_ollama_hud: false,
           verify_running: false,
-          probe_metrics: Slackeel.Ollama.ProbeMetrics.all_map()
+          probe_metrics: Slackeel.Ollama.ProbeMetrics.all_map(),
+          metrics_live: metrics_live,
+          highlight_ollama: highlight_ollama
         )
     end
   end
@@ -48,22 +83,13 @@ defmodule SlackeelWeb.ModelsLive do
     ~H"""
     <div class="telvm-terminal telvm-console-shell slac-tactical slac-preflight-view flex min-h-0 flex-1 flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4">
       <div class="shrink-0">
-        <div class="flex flex-wrap items-center justify-between gap-2 font-mono">
-          <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0">
-            <h1 class="text-xs font-semibold uppercase tracking-wide telvm-accent-text sm:text-sm">
-              Models
-            </h1>
-            <span :if={@refreshed_at} class="telvm-muted-xs text-[10px] tracking-tight">
-              {Calendar.strftime(@refreshed_at, "%m-%d %H:%M")} UTC
-            </span>
-          </div>
-          <button
-            type="button"
-            phx-click="refresh"
-            class="telvm-btn-primary shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:text-[11px]"
-          >
-            Refresh
-          </button>
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono">
+          <h1 class="text-xs font-semibold uppercase tracking-wide telvm-accent-text sm:text-sm">
+            Models
+          </h1>
+          <span :if={@refreshed_at} class="telvm-muted-xs text-[10px] tracking-tight">
+            {Calendar.strftime(@refreshed_at, "%m-%d %H:%M")} UTC
+          </span>
         </div>
 
         <div
@@ -77,8 +103,15 @@ defmodule SlackeelWeb.ModelsLive do
 
       <div :if={@snapshot} class="flex min-h-0 flex-1 flex-col gap-2 font-mono">
         <section class="slac-card slac-card--models-manifest telvm-verify-card telvm-panel-border flex min-h-0 flex-1 flex-col overflow-hidden border border-[color:var(--telvm-shell-border)]">
-          <div class="slac-card__hdr shrink-0 !py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--telvm-shell-muted)]">
-            Manifest
+          <div class="slac-card__hdr flex shrink-0 !py-1 flex-wrap items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--telvm-shell-muted)]">
+            <span>Manifest</span>
+            <span
+              :if={@metrics_live}
+              class="rounded-sm border px-1.5 py-0.5 text-[8px] font-bold tracking-wider telvm-accent-text"
+              style="border-color: color-mix(in oklch, var(--telvm-accent) 45%, transparent); animation: telvm-live-pulse 2s ease-in-out infinite;"
+            >
+              LIVE
+            </span>
           </div>
           <div class="slac-card__body flex min-h-0 flex-1 flex-col gap-0 overflow-hidden !pt-1.5">
             <div class="min-h-0 flex-1 overflow-y-auto overflow-x-auto">
@@ -98,7 +131,8 @@ defmodule SlackeelWeb.ModelsLive do
                     :for={m <- @snapshot.models}
                     class={[
                       "border-b border-[color:var(--telvm-shell-border)]/50",
-                      if(m.enabled?, do: "", else: "opacity-55")
+                      if(m.enabled?, do: "", else: "opacity-55"),
+                      @highlight_ollama == m.ollama && "telvm-models-row--metric-flash"
                     ]}
                   >
                     <td class="max-w-[4rem] truncate py-1 pr-1 align-top sm:max-w-none">{m.family}</td>
@@ -131,7 +165,7 @@ defmodule SlackeelWeb.ModelsLive do
             </div>
             <p class="shrink-0 border-t border-[color:var(--telvm-shell-border)] pt-1 text-[9px] leading-snug text-[var(--telvm-shell-muted)]">
               Gate vs headroom · no unload.
-              tok/s updates after each successful Pre-flight check (RAM only; prefers Ollama eval timing when present).
+              tok/s streams live while Pre-flight verify runs (this page subscribes); last values kept in memory until restart.
             </p>
           </div>
         </section>
