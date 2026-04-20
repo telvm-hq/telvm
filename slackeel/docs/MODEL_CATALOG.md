@@ -2,6 +2,11 @@
 
 This document is the **authoritative planning baseline** for which **families** and **model artifacts** Slackeel intends to expose in the product UI (channel defaults, `@model` routing, admin presets). It is **not** a legal or licensing substitute—verify terms before redistribution.
 
+**Run Ollama locally (clone Slackeel alone):** [OLLAMA.md](OLLAMA.md) — Docker Compose, smoke scripts, pinned image.
+
+**Machine-readable list:** [`manifest/models.json`](../manifest/models.json) (keep in sync when editing this doc).
+
+
 ## How to read disk numbers
 
 
@@ -121,5 +126,6 @@ Slackeel standardizes on **five upstream families** for OSS / CPU-first inferenc
 | Date       | Change                                                                  |
 | ---------- | ----------------------------------------------------------------------- |
 | 2026-04-19 | Initial catalog: five families, planned Ollama names, approximate disk. |
+| 2026-04-19 | Cross-link to repo-local [OLLAMA.md](OLLAMA.md) for self-contained inference stack. |
 
 

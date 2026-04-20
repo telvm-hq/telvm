@@ -1,0 +1,88 @@
+# Slackeel — local inference (Ollama) + optional Phoenix Pre-flight UI.
+# CPU-first defaults; bump image with docs/OLLAMA.md
+name: slackeel
+
+services:
+  slackeel_web:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "4020:4020"
+    # Reach telvm-network-agent on the Docker host (not 127.0.0.1 inside the container).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      SLACKEEL_OLLAMA_BASE_URL: http://ollama:11434
+      SLACKEEL_MANIFEST_PATH: /manifest/models.json
+      SLACKEEL_PREFLIGHT_METRICS_URL: http://host.docker.internal:9225/preflight/metrics
+    volumes:
+      - ./manifest/models.json:/manifest/models.json:ro
+    depends_on:
+      ollama:
+        condition: service_started
+
+  ollama:
+    image: ollama/ollama:0.20.5
+    ports:
+      - "11434:11434"
+    volumes:
+      - slackeel_ollama_data:/root/.ollama
+    environment:
+      CUDA_VISIBLE_DEVICES: "-1"
+      OLLAMA_NUM_PARALLEL: "1"
+
+  ollama_pull:
+    image: ollama/ollama:0.20.5
+    depends_on:
+      ollama:
+        condition: service_started
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      MODEL_A: qwen2.5:0.5b
+      MODEL_B: tinyllama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        echo "ollama_pull: waiting for ollama at $$OLLAMA_HOST..."
+        i=0
+        while [ $$i -lt 120 ]; do
+          if ollama list >/dev/null 2>&1; then
+            echo "ollama_pull: server ready"
+            break
+          fi
+          i=$$((i + 1))
+          sleep 1
+        done
+        if [ $$i -eq 120 ]; then
+          echo "ollama_pull: timeout waiting for server" >&2
+          exit 1
+        fi
+        echo "ollama_pull: pulling $$MODEL_A ..."
+        ollama pull "$$MODEL_A"
+        echo "ollama_pull: pulling $$MODEL_B ..."
+        ollama pull "$$MODEL_B"
+        echo "ollama_pull: done"
+    restart: "no"
+
+  # Verify manifest/models.json against GET /v1/models (and optional chat ping). Slackeel-only; not in Telvm root compose.
+  # No depends_on ollama — avoids starting a *second* Ollama when :11434 is already taken (e.g. Telvm stack).
+  # Default OLLAMA_HOST reaches the host-published port (works for Slackeel or Telvm ollama on 11434).
+  model_doctor:
+    profiles: ["doctor"]
+    build:
+      context: ./docker/model-doctor
+      dockerfile: Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      OLLAMA_HOST: "${OLLAMA_HOST:-http://host.docker.internal:11434}"
+      MANIFEST: /manifest/models.json
+      DOCTOR_CHAT: "${DOCTOR_CHAT:-0}"
+    volumes:
+      - ./manifest/models.json:/manifest/models.json:ro
+    restart: "no"
+
+volumes:
+  slackeel_ollama_data:
