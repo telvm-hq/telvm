@@ -40,6 +40,7 @@ when a token is configured.
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Agent alive, ICS summary, uplink reachable |
+| `GET` | `/preflight/metrics` | **Slackeel Phoenix** Pre-flight: `free_bytes` + `network` diagnostics (same host as agent) |
 | `GET` | `/ics/status` | Full ICS configuration (adapters, subnet, gateway) |
 | `GET` | `/ics/hosts` | Discovered hosts on ICS subnet (IP, MAC, state) |
 | `GET` | `/ics/diagnostics` | Adapters, routes, interfaces, reachability probes |
@@ -62,6 +63,14 @@ curl -H "Authorization: Bearer my-secret-token" http://192.168.137.1:9225/ics/ho
 }
 ```
 
+### Example: Pre-flight metrics (Slackeel)
+
+```powershell
+curl.exe -s http://127.0.0.1:9225/preflight/metrics
+```
+
+Returns JSON including **`free_bytes`** (minimum **Free** among `Get-PSDrive` filesystem volumes—the bottleneck, not a sum of disks), **`disk.volumes`** (per-volume free/used/capacity for audit), **`source`: `telvm-network-agent`**, and **`network`**. Slackeel’s Phoenix app (`slackeel/server`) calls this URL in development by default; see **`slackeel/docs/PREFLIGHT_AND_PR.md`**.
+
 ## Integration with companion
 
 Set these environment variables in `docker-compose.yml` or `.env`:
@@ -81,6 +90,7 @@ and broadcast via PubSub to the preflight **LAN / ICS** panel. Ground truth:
 
 ```
 lib/
+  Disk.ps1       # Minimum free bytes on fixed drives (Slackeel preflight)
   Ics.ps1        # ICS enable/disable via HNetCfg COM
   Inspect.ps1    # Adapter/route/reachability diagnostics
   Discover.ps1   # ARP/neighbor-based host enumeration
