@@ -14,7 +14,7 @@ A hypothetical **slackeel-only** git clone can still run **Docker + Ollama + smo
 ## Status
 
 - **Docs + local inference stack:** model catalog, architecture, [`docker-compose.yml`](docker-compose.yml) for Ollama, smoke tests — see below.
-- **Phoenix / LiveView:** baseline app under [`server/`](server/) with **Pre-flight** at **`/preflight`**; see [docs/PREFLIGHT_AND_PR.md](docs/PREFLIGHT_AND_PR.md).
+- **Phoenix / LiveView:** baseline app under [`server/`](server/) with **Pre-flight** at **`/preflight`**, **Models** at **`/models`**, and **Receipts** (curated recent **`slackapi/node-slack-sdk`** + **`slackapi/python-slack-sdk`** GitHub issues) at **`/receipts`**; see [docs/PREFLIGHT_AND_PR.md](docs/PREFLIGHT_AND_PR.md).
 
 ## Models UI — representative CPU snapshot
 
@@ -138,6 +138,7 @@ Pre-flight metrics URL and related settings are **hardcoded in** [`server/config
 |-----|---------|
 | [docs/OLLAMA.md](docs/OLLAMA.md) | Ollama utility: Compose, smoke tests, **`model_doctor`**, API contract |
 | [docs/PREFLIGHT_AND_PR.md](docs/PREFLIGHT_AND_PR.md) | Pre-flight + agent integration; **PR title/body** for GitHub |
+| [docs/RECEIPTS_PR_FOLLOWUP.md](docs/RECEIPTS_PR_FOLLOWUP.md) | Receipts PR **follow-up comment** (paste on GitHub or `gh pr comment --body-file`) |
 | [manifest/models.json](manifest/models.json) | Advertised Ollama names (`required` flags for doctor) |
 | [docs/MODEL_CATALOG.md](docs/MODEL_CATALOG.md) | Ground truth: families, planned Ollama ids, approximate disk |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Conceptual Phoenix LiveView architecture and boundaries |

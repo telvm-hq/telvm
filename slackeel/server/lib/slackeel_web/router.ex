@@ -23,6 +23,7 @@ defmodule SlackeelWeb.Router do
     live_session :default, layout: {SlackeelWeb.Layouts, :app} do
       live "/models", ModelsLive
       live "/preflight", PreflightLive
+      live "/receipts", ReceiptsLive
     end
   end
 

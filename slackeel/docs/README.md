@@ -8,5 +8,6 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Conceptual Phoenix LiveView architecture and boundaries |
 | [PROGRESS.md](PROGRESS.md) | What is implemented vs planned |
 | [PREFLIGHT_AND_PR.md](PREFLIGHT_AND_PR.md) | Pre-flight dashboard + **telvm-network-agent**; PR title/body for GitHub |
+| [RECEIPTS_PR_FOLLOWUP.md](RECEIPTS_PR_FOLLOWUP.md) | Receipts PR **follow-up comment** (impact + next `slackapi/*` targets); [body file](receipts_pr_followup_github.body.md) for `gh pr comment` |
 | [INTEGRATION_VERIFY.md](INTEGRATION_VERIFY.md) | **`mix slackeel.verify_ollama`** — deterministic manifest-wide Ollama probe; LiveView probe is optional |
 | [ROADMAP_HOST_METRICS.md](ROADMAP_HOST_METRICS.md) | Host metrics scripts today; Zig + MCP-shaped roadmap |
