@@ -16,6 +16,38 @@ A hypothetical **slackeel-only** git clone can still run **Docker + Ollama + smo
 - **Docs + local inference stack:** model catalog, architecture, [`docker-compose.yml`](docker-compose.yml) for Ollama, smoke tests — see below.
 - **Phoenix / LiveView:** baseline app under [`server/`](server/) with **Pre-flight** at **`/preflight`**; see [docs/PREFLIGHT_AND_PR.md](docs/PREFLIGHT_AND_PR.md).
 
+## Models UI — representative CPU snapshot
+
+Open **`http://127.0.0.1:4020/models`** (or **`http://localhost:4020/models`**) for the manifest table plus **probe tok/s** from the integration pipeline (real pulls/probes against your local Ollama — not a standalone synthetic macro-benchmark).
+
+<p align="center">
+  <img src="../docs/assets/slackeel-models-manifest-sample.png" alt="Slackeel Models manifest: families, pull/buffer sizes, probe tok/s" width="920" />
+</p>
+
+**Hardware snapshot (single host, captured for docs):**
+
+- **When (UTC):** `2026-04-20 14:00`
+- **OS:** Microsoft Windows 10 Pro (`10.0.19045`)
+- **CPU:** Intel(R) Core(TM) i7-4700MQ CPU @ 2.40GHz (laptop-class **CPU inference**)
+- **Runtime:** Ollama serving models from Docker (**CPU** path for this snapshot; **no discrete GPU**)
+
+Older screenshots may still show a **Refresh** control next to the heading; current Slackeel removes that button because snapshot data reloads on navigation/mount and probe rows update live.
+
+| Fam | Model | ~Pull | Buf | tok/s | OK |
+|-----|-------|-------|-----|-------|-----|
+| Qwen | qwen2.5:0.5b | 0.37 GiB | 0.43 GiB | 2.4 | Y |
+| Qwen | qwen2.5:1.5b | 0.93 GiB | 1.07 GiB | 1.7 | Y |
+| Llama | llama3.2:1b | 1.21 GiB | 1.39 GiB | 1.3 | Y |
+| Llama | llama3.2:3b | 1.86 GiB | 2.14 GiB | 1.0 | Y |
+| Gemma | gemma2:2b | 1.49 GiB | 1.71 GiB | 1.4 | Y |
+| Phi | phi3:mini | 2.05 GiB | 2.36 GiB | 1.1 | Y |
+| Phi | phi3:3.8b | 2.14 GiB | 2.46 GiB | 4.2 | Y |
+| Mistral | ministral-3:3b | 2.79 GiB | 3.21 GiB | 0.9 | Y |
+| Mistral | mistral:7b | 4.10 GiB | 4.71 GiB | 0.8 | Y |
+| Baseline | tinyllama | 0.56 GiB | 0.64 GiB | 16.2 | Y |
+
+**Disclaimer:** Throughput varies with **CPU model**, thermals, background load, Ollama settings, and whether weights are already resident. Treat this table as **one dated snapshot**, not a performance SLA. Swap in your own PNG under [`docs/assets/slackeel-models-manifest-sample.png`](../docs/assets/slackeel-models-manifest-sample.png) if you want a pixel-accurate browser capture.
+
 ## Local Phoenix (hot reload) + Ollama in Docker
 
 **Recommended for day-to-day Slackeel UI work:** run the Phoenix app on the host so **esbuild, Tailwind, LiveView, and `live_reload`** behave normally, and run **only Ollama** in the background.

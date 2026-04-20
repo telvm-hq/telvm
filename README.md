@@ -74,6 +74,12 @@ Details: [Architecture — OTP, Finch, and the Docker Unix socket](docs/ARCHITEC
 
 6. **Optional — LAN lab (Windows gateway + Ubuntu nodes):** On the Windows PC, run **[`telvm-network-agent`](agents/telvm-network-agent/README.md)** (PowerShell, elevated). Compose sets **`TELVM_NETWORK_AGENT_URL`** (default **`http://host.docker.internal:9225`**); **`Companion.NetworkAgentPoller`** polls that agent, discovers ICS/LAN hosts, and probes each IP for **`telvm-node-agent`** on **:9100** — Pre-flight shows **LAN / ICS** when the URL is set. Use **`TELVM_NETWORK_AGENT_TOKEN`** / **`TELVM_ZIG_NODE_PROBE_TOKEN`** so Bearer auth lines up (see [GROUND_TRUTH](docs/wiki/GROUND_TRUTH.md)). **Physical bring-up** (netplan, UniFi, SSH): **[docs/lan-cluster-network-primer.md](docs/lan-cluster-network-primer.md)**, **[inventories/lan-host/README.md](inventories/lan-host/README.md)**. **Note:** **`Companion.ClusterNodePoller`** (static node list) exists in code but is **not** supervised, not UI-wired, and **`TELVM_CLUSTER_*` is not read in `runtime.exs` yet** — [GROUND_TRUTH](docs/wiki/GROUND_TRUTH.md).
 
+7. **Optional — Slackeel (`:4020`):** **[`slackeel/README.md`](slackeel/README.md)** — separate Phoenix UI for Slackeel **Pre-flight** (`/preflight`) and **Models** (`/models`) with manifest + probe **tok/s** against local **Ollama**. Default: **`http://localhost:4020`** (fixed in Slackeel config so Companion **`:4000`** and Speedeel **`:4010`** stay free). Live runbook + a **CPU snapshot table** live in that README.
+
+<p align="center">
+  <img src="docs/assets/slackeel-models-manifest-sample.png" alt="Slackeel Models manifest sample: probe tok/s on CPU" width="720" />
+</p>
+
 **Operator surfaces on one port:** dashboard pages (`/`, `/health`, `/warm`, `/machines`, **`/oss-agents`** (`/agent` redirects; legacy **`/other-agents`** redirects to **`/machines`**), …), **`/telvm/api/…`** for tools, and **`/app/…` + `/explore/…`** to see and open workloads — [Architecture](docs/ARCHITECTURE.md). **`/topology`** redirects to **`/warm`** (bookmark compatibility). **PubSub, SSE vs LiveView, and what agents see vs the UI:** [Plumbing](docs/plumbing.md).
 
 ### Glossary
@@ -145,6 +151,7 @@ README hero (Warm assets): [`docs/assets/warm-assets-banner.png`](docs/assets/wa
 | [docs/assets/ARCHITECTURE-DIAGRAM.md](docs/assets/ARCHITECTURE-DIAGRAM.md) | Mermaid overview, Simple Icons row |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Diagrams, ProxyPlug, **OTP / Finch / unix socket**, Explorer, agent loop, tests |
 | [docs/CHANGELOG.md](docs/CHANGELOG.md) | Version notes; GitHub Releases link |
+| [slackeel/README.md](slackeel/README.md) | Slackeel (`:4020`): local inference UI, Ollama orchestration, Models snapshot |
 
 ## Community
 
