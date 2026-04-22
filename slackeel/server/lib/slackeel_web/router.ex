@@ -9,6 +9,7 @@ defmodule SlackeelWeb.Router do
     plug :protect_from_forgery
     plug :put_secure_browser_headers
     plug :put_layout, html: {SlackeelWeb.Layouts, :app}
+    plug SlackeelWeb.Plugs.EnsureChatOwner
   end
 
   pipeline :api do
@@ -22,6 +23,8 @@ defmodule SlackeelWeb.Router do
 
     live_session :default, layout: {SlackeelWeb.Layouts, :app} do
       live "/models", ModelsLive
+      live "/chat", ChatLive
+      live "/chat/:id", ChatLive
       live "/preflight", PreflightLive
       live "/receipts", ReceiptsLive
     end

@@ -23,6 +23,17 @@ end
 # Same public port as dev (:4020) so Slackeel stays off :4000 / :4010 (Telvm Companion / Speedeel).
 
 if config_env() == :prod do
+  database_url =
+    System.get_env("DATABASE_URL") ||
+      raise """
+      environment variable DATABASE_URL is missing.
+      For example: postgresql://USER:PASS@HOST:5432/DATABASE
+      """
+
+  config :slackeel, Slackeel.Repo,
+    url: database_url,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+
   config :slackeel, SlackeelWeb.Endpoint,
     server: true,
     secret_key_base: "yyU5ko0EuQLuMvkpbHN562mMhxEOKo0uEj3kJM+L5ZCzkvJi+or7UDhKqcshCkwK",

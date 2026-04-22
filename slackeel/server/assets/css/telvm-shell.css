@@ -128,17 +128,73 @@ body {
   background-color: var(--telvm-shell-bg);
 }
 
-/* Terminal root: matches companion StatusLive width / centering */
+/* Terminal root: matches companion StatusLive width / centering (~20% tighter than 80rem) */
 .telvm-console-shell {
   box-sizing: border-box;
   width: 100%;
-  max-width: 80rem;
+  max-width: 64rem;
   margin-left: auto;
   margin-right: auto;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease,
     background-color 0.2s ease;
+}
+
+/* Chat / models: high-contrast model id (bubble header + warm picker) */
+.slac-model-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  max-width: min(100%, 18rem);
+  padding: 0.2rem 0.45rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--telvm-shell-fg);
+  border-radius: 0.25rem;
+  border: 1.5px solid color-mix(in oklch, var(--telvm-accent) 72%, var(--telvm-shell-border));
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklch, var(--telvm-accent) 34%, var(--telvm-shell-elevated)) 0%,
+    color-mix(in oklch, var(--telvm-accent) 14%, var(--telvm-shell-elevated)) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in oklch, var(--telvm-shell-fg) 14%, transparent),
+    0 1px 3px -1px color-mix(in oklch, var(--telvm-accent) 45%, transparent);
+}
+
+.slac-model-chip--picker {
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.slac-model-chip--picker:hover:not(:disabled) {
+  border-color: color-mix(in oklch, var(--telvm-accent) 88%, var(--telvm-shell-border));
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in oklch, var(--telvm-shell-fg) 18%, transparent),
+    0 2px 8px -2px color-mix(in oklch, var(--telvm-accent) 55%, transparent);
+}
+
+.slac-model-chip--picker-active {
+  color: var(--telvm-accent);
+  border-color: var(--telvm-accent);
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklch, var(--telvm-accent) 42%, var(--telvm-shell-elevated)) 0%,
+    color-mix(in oklch, var(--telvm-accent) 22%, var(--telvm-shell-elevated)) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 0 color-mix(in oklch, var(--telvm-shell-fg) 20%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--telvm-accent) 35%, transparent),
+    0 2px 10px -2px color-mix(in oklch, var(--telvm-accent) 50%, transparent);
 }
 
 .telvm-accent-border-b {
@@ -570,4 +626,103 @@ body {
 
 .telvm-models-row--metric-flash td {
   animation: telvm-metric-row-flash 0.85s ease-out;
+}
+
+.telvm-hot-row--loading td {
+  animation: telvm-live-pulse 1.1s ease-in-out infinite;
+}
+
+.telvm-hot-row--evicting td {
+  opacity: 0.88;
+}
+
+.telvm-hot-row--error td {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--telvm-danger-border) 70%, transparent);
+}
+
+@keyframes telvm-hot-js-pulse {
+  0% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(1.12);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+.telvm-hot-row--js-pulse td {
+  animation: telvm-hot-js-pulse 0.55s ease-out;
+}
+
+/* Hot model load / unload progress (Models + hook-driven tweaks) */
+.telvm-progress-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--telvm-shell-border) 55%, transparent);
+}
+
+.telvm-progress-track--unload {
+  background: color-mix(in oklch, var(--telvm-shell-muted) 35%, transparent);
+}
+
+.telvm-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--telvm-accent) 72%, var(--telvm-shell-muted));
+  transition: width 0.22s ease-out;
+}
+
+.telvm-progress-fill--indeterminate {
+  width: 38%;
+  animation: telvm-progress-slide 1.05s ease-in-out infinite;
+}
+
+.telvm-progress-fill--unload-indeterminate {
+  width: 42%;
+  background: color-mix(in oklch, var(--telvm-shell-muted) 75%, var(--telvm-shell-fg));
+  animation: telvm-progress-slide 0.85s ease-in-out infinite;
+}
+
+@keyframes telvm-progress-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+/* Models: expanded Inference card — scrollable process log */
+.telvm-inference-activity-scroll {
+  min-height: 10.5rem;
+  max-height: min(40vh, 22rem);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+@media (min-width: 1024px) {
+  .telvm-inference-activity-scroll {
+    max-height: none;
+  }
+}
+
+.telvm-inference-card--err {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--telvm-danger-border) 55%, transparent);
+}
+
+.telvm-inference-card--evict {
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--telvm-shell-muted) 45%, transparent);
+}
+
+.telvm-inference-capacity-track {
+  height: 8px;
 }

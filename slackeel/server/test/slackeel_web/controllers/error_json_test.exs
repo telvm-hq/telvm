@@ -1,5 +1,5 @@
 defmodule SlackeelWeb.ErrorJSONTest do
-  use SlackeelWeb.ConnCase, async: true
+  use ExUnit.Case, async: true
 
   test "renders 404" do
     assert SlackeelWeb.ErrorJSON.render("404.json", %{}) == %{errors: %{detail: "Not Found"}}

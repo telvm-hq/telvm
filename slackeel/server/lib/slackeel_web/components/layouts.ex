@@ -8,6 +8,61 @@ defmodule SlackeelWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
+  Compact inference (resident) + optional dual disk readout for the top nav, left of
+  the HEADROOM / STATUS strip. Requires `hot_snapshot` assign; optional `disk_duo` from
+  `Slackeel.Preflight.DiskDuo.load/0`.
+  """
+  attr :hot_snapshot, :map, required: true
+  attr :disk_duo, :map, default: %{}
+
+  def runtime_nav_summary(assigns) do
+    d = Map.get(assigns, :disk_duo) || %{}
+    assigns = assign(assigns, :d_host, Map.get(d, :host))
+    assigns = assign(assigns, :d_app, Map.get(d, :app))
+
+    ~H"""
+    <div
+      class="min-w-0 max-w-[min(100%,20rem)] rounded-sm border px-1.5 py-0.5 font-mono leading-tight sm:px-2"
+      style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-shell-elevated) 48%, transparent);"
+      title="Resident model weights vs heuristic budget. Disk: host (HTTP agent) vs this app / container view."
+    >
+      <div class="text-[7px] uppercase tracking-[0.1em] text-[var(--telvm-shell-muted)] sm:text-[8px]">
+        Summary
+      </div>
+
+      <div class="mt-0.5 break-words tabular-nums text-[8px] text-[var(--telvm-shell-fg)] sm:text-[9px]">
+        {format_nav_gib(@hot_snapshot.used_bytes)} / {format_nav_gib(@hot_snapshot.budget_bytes)}
+        <span class="whitespace-nowrap text-[7px] text-[var(--telvm-shell-muted)] sm:text-[8px]">
+           est.
+        </span>
+      </div>
+
+      <div
+        :if={@d_host}
+        class="mt-0.5 truncate text-[7px] text-[var(--telvm-shell-muted)]"
+        title={summary_disk_title(@d_host)}
+      >
+        {summary_disk_line("Host", @d_host)}
+      </div>
+      <div
+        :if={@d_app}
+        class="truncate text-[7px] text-[var(--telvm-shell-muted)]"
+        title={summary_disk_title(@d_app)}
+      >
+        {summary_disk_line("App", @d_app)}
+      </div>
+    </div>
+    """
+  end
+
+  defp summary_disk_title({_, label}) when is_binary(label), do: label
+  defp summary_disk_title(_), do: ""
+
+  defp summary_disk_line(prefix, {bytes, _}) when is_binary(prefix) and is_integer(bytes) do
+    prefix <> " · " <> format_nav_gib(bytes) <> " free"
+  end
+
+  @doc """
   Live headroom + status readout for the top nav (driven by LiveView `snapshot` assign).
   """
   attr :snapshot, :map, required: true
@@ -26,20 +81,25 @@ defmodule SlackeelWeb.Layouts do
         <div class="text-[8px] uppercase tracking-[0.12em] text-[var(--telvm-shell-muted)]">
           Headroom
         </div>
+
         <div class="truncate telvm-accent-dim-text" title={origin_label_nav(@snapshot.origin)}>
           {origin_label_nav(@snapshot.origin)}
         </div>
+
         <div class="tabular-nums text-[var(--telvm-shell-fg)]">
           {format_nav_gib(@snapshot.effective_free_bytes)} free
         </div>
+
         <div class="text-[8px] leading-tight text-[var(--telvm-shell-muted)]">
           1024³ GiB · floor = bottleneck.
         </div>
       </div>
+
       <div class="min-w-0 pl-0">
         <div class="text-[8px] uppercase tracking-[0.12em] text-[var(--telvm-shell-muted)]">
           Status
         </div>
+
         <div class="text-[var(--telvm-shell-fg)]">
           +{@variance_pct}% ·
           <code
@@ -49,6 +109,7 @@ defmodule SlackeelWeb.Layouts do
             :preflight_disk_variance
           </code>
         </div>
+
         <p
           :if={@snapshot.remote_error}
           class="truncate text-[8px] leading-tight telvm-text-warn"
@@ -109,10 +170,12 @@ defmodule SlackeelWeb.Layouts do
       ]}
       style="border-color: var(--telvm-shell-border); background: color-mix(in oklch, var(--telvm-shell-elevated) 55%, transparent);"
     >
-      <div class="mx-auto max-w-7xl px-2 py-1.5 sm:px-3">
+      <div class="mx-auto max-w-5xl px-2 py-1.5 sm:px-3">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-[color-mix(in_oklch,var(--telvm-shell-border)_55%,transparent)] pb-2">
           <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span class="shrink-0 font-semibold uppercase tracking-[0.16em] telvm-accent-text">verify</span>
+            <span class="shrink-0 font-semibold uppercase tracking-[0.16em] telvm-accent-text">
+              verify
+            </span>
             <span
               class="min-w-0 truncate text-[var(--telvm-shell-muted)]"
               title={@ollama_url}
@@ -146,7 +209,10 @@ defmodule SlackeelWeb.Layouts do
               Edit → <span class="font-semibold text-[var(--telvm-shell-fg)]">lock</span>
               → <span class="font-semibold text-[var(--telvm-shell-fg)]">check</span>.
               <span :if={@probe_prompt_needs_commit} class="telvm-accent-text"> Unsaved edits.</span>
-              <span :if={not @probe_prompt_needs_commit and String.trim(@probe_prompt_locked) != ""} class="telvm-text-ok">
+              <span
+                :if={not @probe_prompt_needs_commit and String.trim(@probe_prompt_locked) != ""}
+                class="telvm-text-ok"
+              >
                 Ready.
               </span>
             </p>
@@ -159,8 +225,10 @@ defmodule SlackeelWeb.Layouts do
               disabled={@verify_running or not @probe_prompt_needs_commit}
               class={[
                 "rounded-sm border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide",
-                @probe_prompt_needs_commit && not @verify_running && "telvm-btn-secondary border-[color-mix(in_oklch,var(--telvm-accent)_45%,transparent)]",
-                (not @probe_prompt_needs_commit or @verify_running) && "cursor-not-allowed opacity-45 border-[color-mix(in_oklch,var(--telvm-shell-border)_70%,transparent)] text-[var(--telvm-shell-muted)]"
+                @probe_prompt_needs_commit && not @verify_running &&
+                  "telvm-btn-secondary border-[color-mix(in_oklch,var(--telvm-accent)_45%,transparent)]",
+                (not @probe_prompt_needs_commit or @verify_running) &&
+                  "cursor-not-allowed opacity-45 border-[color-mix(in_oklch,var(--telvm-shell-border)_70%,transparent)] text-[var(--telvm-shell-muted)]"
               ]}
               title="Apply draft — required before check uses your text"
             >
@@ -197,11 +265,14 @@ defmodule SlackeelWeb.Layouts do
               <summary class="cursor-pointer list-none rounded-sm border border-[color-mix(in_oklch,var(--telvm-shell-border)_70%,transparent)] bg-[color-mix(in_oklch,var(--telvm-shell-bg)_35%,transparent)] px-2 py-1 text-[9px] uppercase tracking-wide text-[var(--telvm-shell-muted)] marker:content-none hover:text-[var(--telvm-shell-fg)] [&::-webkit-details-marker]:hidden">
                 ?
               </summary>
-              <div class="absolute right-0 z-10 mt-1 w-[min(100vw-2rem,22rem)] space-y-1.5 rounded-sm border p-2 text-[9px] leading-relaxed text-[var(--telvm-shell-muted)] shadow-lg sm:left-0 sm:right-auto sm:w-80"
+
+              <div
+                class="absolute right-0 z-10 mt-1 w-[min(100vw-2rem,22rem)] space-y-1.5 rounded-sm border p-2 text-[9px] leading-relaxed text-[var(--telvm-shell-muted)] shadow-lg sm:left-0 sm:right-auto sm:w-80"
                 style="border-color: var(--telvm-shell-border); background: var(--telvm-panel-bg);"
               >
                 <p class="text-[var(--telvm-shell-fg)]">
-                  Type your probe → <strong class="text-[var(--telvm-shell-fg)]">lock</strong> arms that exact string for the run →
+                  Type your probe → <strong class="text-[var(--telvm-shell-fg)]">lock</strong>
+                  arms that exact string for the run →
                   <strong class="text-[var(--telvm-shell-fg)]">check</strong>
                   pulls / probes / unloads. Default is
                   <code class="rounded px-0.5 text-[8px]" style="background: var(--telvm-input-bg);">
@@ -209,6 +280,7 @@ defmodule SlackeelWeb.Layouts do
                   </code>
                   from config until you change it.
                 </p>
+
                 <p class="border-t pt-1.5 text-[8px]" style="border-color: var(--telvm-shell-border);">
                   Stop finishes the current request if needed, then skips the rest.
                 </p>
@@ -230,9 +302,7 @@ defmodule SlackeelWeb.Layouts do
   def flash_group(assigns) do
     ~H"""
     <div id={@id} aria-live="polite">
-      <.flash kind={:info} flash={@flash} />
-      <.flash kind={:error} flash={@flash} />
-
+      <.flash kind={:info} flash={@flash} /> <.flash kind={:error} flash={@flash} />
       <.flash
         id="client-error"
         kind={:error}

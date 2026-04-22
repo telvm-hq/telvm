@@ -7,6 +7,25 @@ defmodule Slackeel.Preflight do
   alias Slackeel.Preflight.{DiskLocal, MetricsRemote, ModelSizes}
 
   @doc """
+  Returns `{:ok, [ollama_tag, ...]}` from the configured manifest, or `{:error, reason}`.
+  """
+  def manifest_ollama_tags do
+    manifest_path = Application.get_env(:slackeel, :manifest_path)
+
+    with {:ok, body} <- File.read(manifest_path),
+         {:ok, decoded} <- Jason.decode(body),
+         models when is_list(models) <- decoded["models"] do
+      {:ok,
+       models
+       |> Enum.map(fn row -> Map.get(row, "ollama") || Map.get(row, :ollama) end)
+       |> Enum.filter(&is_binary/1)}
+    else
+      {:error, _} = e -> e
+      _ -> {:error, :bad_manifest}
+    end
+  end
+
+  @doc """
   Builds a full dashboard payload: metrics origin, effective free bytes, manifest rows.
   """
   def snapshot do
@@ -25,8 +44,11 @@ defmodule Slackeel.Preflight do
 
         {:error, remote_reason} ->
           case DiskLocal.snapshot() do
-            {:ok, m} -> {m, {:remote_failed, remote_reason}}
-            {:error, local_reason} -> {nil, {:both_failed, remote: remote_reason, local: local_reason}}
+            {:ok, m} ->
+              {m, {:remote_failed, remote_reason}}
+
+            {:error, local_reason} ->
+              {nil, {:both_failed, remote: remote_reason, local: local_reason}}
           end
       end
 

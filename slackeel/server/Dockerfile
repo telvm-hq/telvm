@@ -9,6 +9,12 @@ RUN mix local.hex --force && mix local.rebar --force
 
 ENV MIX_ENV=prod
 
+# `config/runtime.exs` runs for every Mix task in prod and requires DATABASE_URL.
+# Image build has no Compose network yet — dummy URL (no connection during deps/compile).
+# Override at container runtime via Compose `DATABASE_URL`.
+ARG DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/postgres
+ENV DATABASE_URL=$DATABASE_URL
+
 COPY mix.exs mix.lock ./
 COPY config config
 

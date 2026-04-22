@@ -13,7 +13,9 @@ defmodule Slackeel.Ollama.IntegrationVerify do
     prompt = Keyword.get(opts, :prompt) || Config.integration_verify_prompt()
     verbose? = Keyword.get(opts, :verbose, false)
 
-    case Chat.completion(ollama_model, [%{"role" => "user", "content" => prompt}], verbose: verbose?) do
+    case Chat.completion(ollama_model, [%{"role" => "user", "content" => prompt}],
+           verbose: verbose?
+         ) do
       {:ok, text, meta} -> {:ok, String.trim(text), meta}
       {:error, _} = e -> e
     end

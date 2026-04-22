@@ -11,11 +11,12 @@ defmodule Slackeel.Application do
 
     children = [
       SlackeelWeb.Telemetry,
+      Slackeel.Repo,
       {Finch, name: Slackeel.Finch, pools: %{default: [size: 16]}},
       {DNSCluster, query: Application.get_env(:slackeel, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Slackeel.PubSub},
-      # Start a worker by calling: Slackeel.Worker.start_link(arg)
-      # {Slackeel.Worker, arg},
+      {Task.Supervisor, name: Slackeel.Ollama.HotTaskSupervisor},
+      Slackeel.Ollama.HotRegistry,
       # Start to serve requests, typically the last entry
       SlackeelWeb.Endpoint
     ]

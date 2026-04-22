@@ -64,10 +64,22 @@ Older screenshots may still show a **Refresh** control next to the heading; curr
 
    `ollama pull qwen2.5:0.5b`
 
-3. **Run Phoenix** from **`slackeel/server/`** (that is where **`mix.exs`** lives; there is no Mix project in `slackeel/` alone):
+3. **PostgreSQL** for persisted chat (`/chat`): Slackeel uses **Ecto + PostgreSQL**. Example local container (creates **`slackeel_dev`**; add **`slackeel_test`** for `mix test`):
 
    ```bash
-   mix setup   # first time
+   docker run -d --name slackeel-pg -p 5432:5432 \
+     -e POSTGRES_PASSWORD=postgres \
+     -e POSTGRES_DB=slackeel_dev \
+     postgres:16-alpine
+   docker exec slackeel-pg psql -U postgres -c "CREATE DATABASE slackeel_test;"
+   ```
+
+   Then either rely on the dev default in [`server/config/dev.exs`](server/config/dev.exs) (`postgresql://postgres:postgres@127.0.0.1:5432/slackeel_dev`) or set **`DATABASE_URL`** for dev or test.
+
+4. **Run Phoenix** from **`slackeel/server/`** (that is where **`mix.exs`** lives; there is no Mix project in `slackeel/` alone):
+
+   ```bash
+   mix setup   # first time: deps, ecto.create/migrate, assets
    mix phx.server
    ```
 
@@ -103,14 +115,34 @@ Full detail: **[docs/OLLAMA.md](docs/OLLAMA.md)**.
 
 ### Phoenix in Docker (Ollama + Slackeel UI)
 
+**Compose file and cwd:** [`docker-compose.yml`](docker-compose.yml) lives under **`slackeel/`** (next to `server/`), not inside **`server/`**. Run **`docker compose`** with that file as the working directory, or from **`slackeel/server/`** use **`docker compose -f ../docker-compose.yml`** (paths in the file are relative to **`slackeel/`**, e.g. build `context: ./server`).
+
+**Service names vs container names:** Compose service **`postgres`** starts a container that may be named like **`slackeel-postgres-1`**. Use the **service** name in commands, e.g. **`docker compose up -d postgres`**, not the container name.
+
 From **`slackeel/`**, build and run the release with Compose so the app talks to the Compose **ollama** service and reads **`manifest/models.json`** from the repo:
 
 ```bash
 docker compose build slackeel_web
-docker compose up -d ollama slackeel_web
+docker compose up -d ollama postgres slackeel_web
 ```
 
-Then open **`http://127.0.0.1:4020/preflight`**. Compose sets **`SLACKEEL_OLLAMA_BASE_URL=http://ollama:11434`**, mounts **`manifest/models.json`**, and **`SLACKEEL_PREFLIGHT_METRICS_URL=http://host.docker.internal:9225/preflight/metrics`** so the app reaches **telvm-network-agent on the Docker host** (not `127.0.0.1` inside the container). If the agent is not running, disk headroom falls back to **`df -Pk /`** inside the container. Rebuild after app changes: **`docker compose build slackeel_web`**. To disable HTTP metrics and use only local disk hints, set **`SLACKEEL_PREFLIGHT_METRICS_URL=`** (empty) in the service environment.
+**PostgreSQL** is included as the **`postgres`** service; **`slackeel_web`** gets **`DATABASE_URL=postgresql://postgres:postgres@postgres:5432/slackeel_dev`** and waits until Postgres is healthy. The database is published on the host as **`127.0.0.1:54322`** (avoids clashing with a local Postgres on **`:5432`**).
+
+**First-time schema (migrations):** `/chat` loads conversations from Postgres; a **fresh volume has no tables** until you migrate once. With Compose Postgres up, from **`slackeel/server/`**:
+
+```bash
+# Bash (Linux/macOS/Git Bash)
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/slackeel_dev mix ecto.migrate
+
+# PowerShell (use $env:… — `set VAR=value` is cmd.exe and will not apply to Mix)
+$env:DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:54322/slackeel_dev"; mix ecto.migrate
+```
+
+Then open **`http://127.0.0.1:4020/preflight`** or **`http://127.0.0.1:4020/chat`**. Compose sets **`SLACKEEL_OLLAMA_BASE_URL=http://ollama:11434`**, mounts **`manifest/models.json`**, and **`SLACKEEL_PREFLIGHT_METRICS_URL=http://host.docker.internal:9225/preflight/metrics`** so the app reaches **telvm-network-agent on the Docker host** (not `127.0.0.1` inside the container). If the agent is not running, disk headroom falls back to **`df -Pk /`** inside the container. Rebuild after app changes: **`docker compose build slackeel_web`**. To disable HTTP metrics and use only local disk hints, set **`SLACKEEL_PREFLIGHT_METRICS_URL=`** (empty) in the service environment.
+
+**Chat list titles:** new threads are named **`Conversation` *n***, then after the first assistant reply completes a one-shot Ollama request (same model) replaces the title with a short summary. This is not the same as using only the first line of the user’s message.
+
+**If `/chat` errors but Pre-flight works:** run **`mix ecto.migrate`** as above (missing **`chat_conversations`** / **`chat_messages`** tables). Confirm with **`docker compose logs slackeel_web`** (look for **`Postgrex.Error`** or **`relation "chat_conversations" does not exist`**) and a quick HTTP check: **`curl -s -o NUL -w "%{http_code}" http://127.0.0.1:4020/chat`** — expect **200** after migrate, often **500** before.
 
 ## Phoenix + Pre-flight (Windows host, telvm checkout)
 

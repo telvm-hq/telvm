@@ -55,7 +55,11 @@ defmodule Slackeel.Ollama.Chat do
     duration_ms = duration_us / 1000
 
     case resp do
-      {:ok, %{status: 200, body: %{"choices" => [%{"message" => %{"content" => text}} | _]} = resp_body}}
+      {:ok,
+       %{
+         status: 200,
+         body: %{"choices" => [%{"message" => %{"content" => text}} | _]} = resp_body
+       }}
       when is_binary(text) ->
         if verbose? do
           prev = text |> String.replace("\n", " ") |> String.slice(0, 240)
@@ -80,7 +84,14 @@ defmodule Slackeel.Ollama.Chat do
 
       {:ok, %{status: 200, body: body}} when is_map(body) ->
         err = body["error"]
-        if verbose?, do: IO.puts(:stderr, "[ollama] HTTP 200 but error field: #{inspect(err, limit: :infinity)}")
+
+        if verbose?,
+          do:
+            IO.puts(
+              :stderr,
+              "[ollama] HTTP 200 but error field: #{inspect(err, limit: :infinity)}"
+            )
+
         {:error, {:api, err || body}}
 
       {:ok, %{status: s, body: body}} ->
@@ -98,7 +109,9 @@ defmodule Slackeel.Ollama.Chat do
         {:error, {:http, s, body}}
 
       {:error, reason} = err ->
-        if verbose?, do: IO.puts(:stderr, "[ollama] transport error #{inspect(reason, limit: :infinity)}")
+        if verbose?,
+          do: IO.puts(:stderr, "[ollama] transport error #{inspect(reason, limit: :infinity)}")
+
         err
     end
   end

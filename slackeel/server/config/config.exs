@@ -7,8 +7,10 @@
 # General application configuration
 import Config
 
+config :slackeel, ecto_repos: [Slackeel.Repo]
+
 config :slackeel,
-  generators: [timestamp_type: :utc_datetime],
+  generators: [timestamp_type: :utc_datetime_usec],
   # __DIR__ is server/config → repo manifest is ../../manifest (slackeel/manifest/models.json)
   manifest_path: Path.expand("../../manifest/models.json", __DIR__),
   preflight_disk_variance: 1.15,
@@ -19,6 +21,14 @@ config :slackeel,
   ollama_base_url: "http://127.0.0.1:11434",
   ollama_chat_timeout_ms: 120_000,
   ollama_pull_timeout_ms: 7_200_000,
+  # Heuristic VRAM/RAM budget for concurrent resident weights (GiB, 1024³). Distinct from disk preflight headroom.
+  inference_memory_budget_gib: 16.0,
+  # Same spirit as :preflight_disk_variance — margin on approximate pull bytes for capacity math.
+  inference_memory_variance: 1.15,
+  # Ollama keep_alive passed when warming models onto the runner (see HotRegistry / Control.warm/1).
+  hot_models_keep_alive: "15m",
+  # When true, skip pull/warm HTTP (tests only).
+  hot_registry_dry_run: false,
   integration_verify_max_parallel: 3,
   integration_verify_retries: 3,
   integration_verify_prompt: "ciao!"
