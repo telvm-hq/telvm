@@ -32,6 +32,8 @@ defmodule SlackeelWeb.ConnCase do
   end
 
   setup _tags do
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Slackeel.Repo)
+    Ecto.Adapters.SQL.Sandbox.mode(Slackeel.Repo, {:shared, self()})
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

@@ -8,7 +8,13 @@
         href={~p"/preflight"}
         class="flex min-w-0 items-center gap-1.5 sm:gap-2 transition-colors telvm-accent-text hover:opacity-90 shrink-0"
       >
-        <img src={~p"/images/logo.svg"} width="28" height="28" class="sm:w-9 sm:h-9 w-7 h-7" alt="" />
+        <img
+          src={~p"/images/logo.svg"}
+          width="28"
+          height="28"
+          class="sm:w-9 sm:h-9 w-7 h-7"
+          alt=""
+        />
         <span class="text-[11px] sm:text-sm font-semibold tracking-wide uppercase truncate">
           Slackeel
         </span>
@@ -29,12 +35,24 @@
             {Calendar.strftime(Map.get(assigns, :refreshed_at), "%Y-%m-%d %H:%M:%S")} UTC
           </time>
         </li>
+
+        <li
+          :if={Map.get(assigns, :hot_snapshot)}
+          class="mr-0.5 hidden min-w-0 max-w-[min(100%,22rem)] shrink sm:flex sm:items-stretch"
+        >
+          <.runtime_nav_summary
+            hot_snapshot={@hot_snapshot}
+            disk_duo={Map.get(assigns, :disk_duo, %{})}
+          />
+        </li>
+
         <li
           :if={Map.get(assigns, :snapshot)}
           class="mr-0.5 hidden min-w-0 max-w-[min(100%,52rem)] shrink overflow-x-auto sm:flex sm:items-center"
         >
           <.preflight_nav_strip snapshot={Map.get(assigns, :snapshot)} />
         </li>
+
         <li class="shrink-0">
           <a
             href={~p"/models"}
@@ -43,6 +61,16 @@
             Models
           </a>
         </li>
+
+        <li class="shrink-0">
+          <a
+            href={~p"/chat"}
+            class="btn btn-ghost btn-xs sm:btn-sm px-2 telvm-nav-tab-idle border border-transparent rounded-sm"
+          >
+            Chat
+          </a>
+        </li>
+
         <li class="shrink-0">
           <a
             href={~p"/receipts"}
@@ -51,6 +79,7 @@
             Receipts
           </a>
         </li>
+
         <li class="shrink-0">
           <a
             href={~p"/preflight"}
@@ -59,9 +88,8 @@
             Pre-Flight
           </a>
         </li>
-        <li class="flex shrink-0 items-center gap-1">
-          <.accent_toggle /> <.theme_toggle />
-        </li>
+
+        <li class="flex shrink-0 items-center gap-1"><.accent_toggle /> <.theme_toggle /></li>
       </ul>
     </div>
   </header>
@@ -73,11 +101,8 @@
     probe_prompt_locked={Map.get(assigns, :probe_prompt_locked, "")}
     probe_prompt_needs_commit={Map.get(assigns, :probe_prompt_needs_commit, false)}
   />
-
   <main class="flex min-h-0 flex-1 flex-col px-2 py-1 sm:px-3 sm:py-1.5 transition-colors duration-200">
-    <div class="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
-      {@inner_content}
-    </div>
+    <div class="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col">{@inner_content}</div>
   </main>
   <.flash_group flash={@flash} />
 </div>

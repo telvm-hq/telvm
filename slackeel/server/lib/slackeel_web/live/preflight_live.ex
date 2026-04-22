@@ -1,7 +1,8 @@
 defmodule SlackeelWeb.PreflightLive do
   use SlackeelWeb, :live_view
 
-  alias Slackeel.Ollama.VerifyPipeline
+  alias Slackeel.Ollama.{HotRegistry, VerifyPipeline}
+  alias Slackeel.Preflight.DiskDuo
 
   @impl true
   def mount(_params, _session, socket) do
@@ -356,7 +357,10 @@ defmodule SlackeelWeb.PreflightLive do
   defp format_verify_error({:pull, e}), do: "Pull: " <> format_verify_error(e)
   defp format_verify_error({:http, s, b}), do: "HTTP #{s}: #{inspect(b, limit: 200)}"
   defp format_verify_error({:api, e}), do: "API: #{inspect(e, limit: 200)}"
-  defp format_verify_error({:bad_shape, m}), do: "Unexpected response shape: #{inspect(m, limit: 200)}"
+
+  defp format_verify_error({:bad_shape, m}),
+    do: "Unexpected response shape: #{inspect(m, limit: 200)}"
+
   defp format_verify_error({:pull_response, o}), do: "Pull: #{inspect(o, limit: 120)}"
   defp format_verify_error(e) when is_binary(e), do: e
   defp format_verify_error(e), do: inspect(e, limit: 500)
@@ -384,6 +388,8 @@ defmodule SlackeelWeb.PreflightLive do
       end
 
     needs_commit = String.trim(draft) != String.trim(locked)
+    hot = HotRegistry.snapshot()
+    disk = DiskDuo.load()
 
     case Slackeel.Preflight.snapshot() do
       {:ok, snap} ->
@@ -392,6 +398,8 @@ defmodule SlackeelWeb.PreflightLive do
           top_bar_title: "PRE-FLIGHT",
           error: nil,
           snapshot: snap,
+          hot_snapshot: hot,
+          disk_duo: disk,
           refreshed_at: DateTime.utc_now(),
           verify_results: vr,
           verify_running: vw,
@@ -410,6 +418,8 @@ defmodule SlackeelWeb.PreflightLive do
           top_bar_title: "PRE-FLIGHT",
           error: inspect(reason),
           snapshot: nil,
+          hot_snapshot: hot,
+          disk_duo: disk,
           refreshed_at: DateTime.utc_now(),
           verify_results: vr,
           verify_running: vw,
@@ -428,7 +438,9 @@ defmodule SlackeelWeb.PreflightLive do
   def render(assigns) do
     ~H"""
     <div class="telvm-terminal telvm-console-shell slac-tactical slac-preflight-view flex min-h-0 flex-1 flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4">
-      <div :if={@error} class="shrink-0 rounded-sm border px-2 py-1 text-[11px] telvm-text-danger-ink font-mono"
+      <div
+        :if={@error}
+        class="shrink-0 rounded-sm border px-2 py-1 text-[11px] telvm-text-danger-ink font-mono"
         style="border-color: var(--telvm-danger-border); background: var(--telvm-danger-bg);"
       >
         METRICS FAIL — {@error}
@@ -482,10 +494,13 @@ defmodule SlackeelWeb.PreflightLive do
                 <div class="telvm-mission-board__hdr shrink-0">
                   <span>Model</span>
                   <span class="telvm-mission-phase" title="Pull weights (local)">P</span>
-                  <span class="telvm-mission-phase" title="Probe phase (OK = request finished)">C</span>
+                  <span class="telvm-mission-phase" title="Probe phase (OK = request finished)">
+                    C
+                  </span>
                   <span class="telvm-mission-phase" title="Unload from VRAM">U</span>
                   <span class="text-right">Sync</span>
                 </div>
+
                 <div class="telvm-mission-board__scroll">
                   <div
                     :for={{m, idx, r} <- mission_rows(@snapshot.models, @verify_results)}
@@ -493,21 +508,31 @@ defmodule SlackeelWeb.PreflightLive do
                     class={mission_row_classes(r)}
                   >
                     <div class="telvm-mission-model" title={m.ollama}>{m.ollama}</div>
+
                     <div class="telvm-mission-phase">
                       <span class={phase_pill_class(r.pull)}>{phase_label(r.pull)}</span>
                     </div>
+
                     <div class="telvm-mission-phase">
                       <span class={phase_pill_class(r.probe)}>{phase_label(r.probe)}</span>
                     </div>
+
                     <div class="telvm-mission-phase">
                       <span class={phase_pill_class(r.unload)}>{phase_label(r.unload)}</span>
                     </div>
+
                     <div class="flex justify-end">
-                      <span :if={r.overall == :standby} class={overall_pill_class(:standby)}>STBY</span>
+                      <span :if={r.overall == :standby} class={overall_pill_class(:standby)}>
+                        STBY
+                      </span>
                       <span :if={r.overall == :waiting} class={overall_pill_class(:waiting)}>Q</span>
-                      <span :if={r.overall == :in_progress} class={overall_pill_class(:in_progress)}>…</span>
+                      <span :if={r.overall == :in_progress} class={overall_pill_class(:in_progress)}>
+                        …
+                      </span>
                       <span :if={r.overall == :done_ok} class={overall_pill_class(:done_ok)}>OK</span>
-                      <span :if={r.overall == :done_error} class={overall_pill_class(:done_error)}>X</span>
+                      <span :if={r.overall == :done_error} class={overall_pill_class(:done_error)}>
+                        X
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -518,6 +543,7 @@ defmodule SlackeelWeb.PreflightLive do
                 style="background: var(--telvm-input-bg);"
               >
                 <p class="telvm-muted-xs uppercase tracking-wide">armed probe</p>
+
                 <p class="mt-1 text-[8px] leading-snug text-[var(--telvm-shell-muted)]">
                   Edit and lock in the verify bar above — check always sends this text.
                 </p>
@@ -554,18 +580,27 @@ defmodule SlackeelWeb.PreflightLive do
                 <p class="shrink-0 border-b border-[color:var(--telvm-shell-border)] px-2 py-1 text-[9px] leading-snug text-[var(--telvm-shell-muted)]">
                   Serial probe — same prompt per model, one block per model.
                 </p>
-                <div class="shrink-0 border-b border-[color:var(--telvm-shell-border)] px-2 py-2" style="background: color-mix(in oklch, var(--telvm-shell-elevated) 25%, transparent);">
+
+                <div
+                  class="shrink-0 border-b border-[color:var(--telvm-shell-border)] px-2 py-2"
+                  style="background: color-mix(in oklch, var(--telvm-shell-elevated) 25%, transparent);"
+                >
                   <span class="text-[9px] text-[var(--telvm-shell-muted)]">
                     # in · probe is set in the verify bar — same text per model below
                   </span>
                 </div>
+
                 <div data-probe-log-scroll class="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-                  <div :for={m <- @snapshot.models} class="border-b border-[color:var(--telvm-shell-border)] py-2.5 last:border-b-0">
+                  <div
+                    :for={m <- @snapshot.models}
+                    class="border-b border-[color:var(--telvm-shell-border)] py-2.5 last:border-b-0"
+                  >
                     <div class="text-[10px] telvm-accent-text break-all">{m.ollama}</div>
+
                     <div class="mt-1.5 space-y-2 border-l-2 pl-2 telvm-prose-bar">
                       <div>
-                        <span class="text-[9px] text-[var(--telvm-shell-muted)]"># out</span>
-                        <% r = verify_row_for(@verify_results, m.ollama) %>
+                        <span class="text-[9px] text-[var(--telvm-shell-muted)]"># out</span> <% r =
+                          verify_row_for(@verify_results, m.ollama) %>
                         <%= case assistant_chat_segment(r) do %>
                           <% {:reply, text} -> %>
                             <pre class="mt-0.5 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-sm border border-[color:var(--telvm-shell-border)] bg-[color-mix(in_oklch,var(--telvm-shell-bg)_40%,transparent)] p-1.5 text-[10px] leading-relaxed sm:max-h-52">{text}</pre>
@@ -589,39 +624,60 @@ defmodule SlackeelWeb.PreflightLive do
       </div>
 
       <div
-        :if={@snapshot && (agent_disk_volumes(@snapshot) != [] || (@snapshot.disks && @snapshot.disks != []))}
+        :if={
+          @snapshot &&
+            (agent_disk_volumes(@snapshot) != [] || (@snapshot.disks && @snapshot.disks != []))
+        }
         class="slac-preflight-disk-grid mt-1 shrink-0 space-y-1.5"
       >
-        <p class="text-center text-[9px] uppercase tracking-wider text-[var(--telvm-shell-muted)]">Host</p>
+        <p class="text-center text-[9px] uppercase tracking-wider text-[var(--telvm-shell-muted)]">
+          Host
+        </p>
+
         <div class="slac-grid">
           <section
             :if={agent_disk_volumes(@snapshot) != []}
             class="slac-card slac-card--square telvm-verify-card telvm-panel-border"
           >
             <div class="slac-card__hdr">Agent disk</div>
+
             <div class="slac-card__body">
               <p :if={agent_disk_note(@snapshot) != ""} class="telvm-muted-xs mb-2 leading-snug">
                 {agent_disk_note(@snapshot)}
               </p>
+
               <div class="min-w-0 overflow-x-auto">
                 <table class="w-full text-left text-[10px] sm:text-xs font-mono">
                   <thead>
                     <tr class="border-b border-[color:var(--telvm-shell-border)]">
                       <th class="py-1 pr-1 font-medium text-[var(--telvm-shell-muted)]">Vol</th>
+
                       <th class="py-1 px-0.5 text-right">Free</th>
+
                       <th class="py-1 px-0.5 text-right">Used</th>
+
                       <th class="py-1 pl-0.5 text-right">Cap</th>
                     </tr>
                   </thead>
+
                   <tbody>
                     <tr
                       :for={v <- agent_disk_volumes(@snapshot)}
                       class="border-b border-[color:var(--telvm-shell-border)]/50"
                     >
                       <td class="py-1 pr-1 align-top">{v["name"]}{root_label(v["root"])}</td>
-                      <td class="py-1 px-0.5 text-right whitespace-nowrap">{format_gib(coerce_bytes(v["free_bytes"]))}</td>
-                      <td class="py-1 px-0.5 text-right whitespace-nowrap">{format_gib(coerce_bytes(v["used_bytes"]))}</td>
-                      <td class="py-1 pl-0.5 text-right whitespace-nowrap">{format_gib(coerce_bytes(v["capacity_bytes"]))}</td>
+
+                      <td class="py-1 px-0.5 text-right whitespace-nowrap">
+                        {format_gib(coerce_bytes(v["free_bytes"]))}
+                      </td>
+
+                      <td class="py-1 px-0.5 text-right whitespace-nowrap">
+                        {format_gib(coerce_bytes(v["used_bytes"]))}
+                      </td>
+
+                      <td class="py-1 pl-0.5 text-right whitespace-nowrap">
+                        {format_gib(coerce_bytes(v["capacity_bytes"]))}
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -634,22 +690,28 @@ defmodule SlackeelWeb.PreflightLive do
             class="slac-card slac-card--square telvm-verify-card telvm-panel-border"
           >
             <div class="slac-card__hdr">Beam disks</div>
+
             <div class="slac-card__body min-w-0 overflow-x-auto">
               <table class="w-full text-left text-[10px] sm:text-xs font-mono">
                 <thead>
                   <tr class="border-b border-[color:var(--telvm-shell-border)]">
                     <th class="py-1 pr-1">ID</th>
+
                     <th class="py-1 px-0.5 text-right">Avail</th>
+
                     <th class="py-1 pl-0.5 text-right">Cap</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   <tr
                     :for={d <- @snapshot.disks}
                     class="border-b border-[color:var(--telvm-shell-border)]/50"
                   >
                     <td class="py-1 pr-1">{d.id}</td>
+
                     <td class="py-1 px-0.5 text-right">{format_gib_kb(d.available_kb)}</td>
+
                     <td class="py-1 pl-0.5 text-right">{format_gib_kb(d.capacity_kb)}</td>
                   </tr>
                 </tbody>
@@ -699,19 +761,23 @@ defmodule SlackeelWeb.PreflightLive do
   defp phase_label(_), do: "—"
 
   defp overall_pill_class(:standby),
-    do: "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-muted-xs telvm-pill-neutral"
+    do:
+      "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-muted-xs telvm-pill-neutral"
 
   defp overall_pill_class(:waiting),
-    do: "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-muted-xs telvm-pill-neutral"
+    do:
+      "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-muted-xs telvm-pill-neutral"
 
   defp overall_pill_class(:in_progress),
-    do: "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-accent-text telvm-pill-accent"
+    do:
+      "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-accent-text telvm-pill-accent"
 
   defp overall_pill_class(:done_ok),
     do: "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-text-ok telvm-pill-ok"
 
   defp overall_pill_class(:done_error),
-    do: "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-text-danger-ink telvm-pill-bad"
+    do:
+      "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-text-danger-ink telvm-pill-bad"
 
   defp overall_pill_class(_),
     do: "inline-flex rounded px-2 py-0.5 text-[10px] font-medium telvm-muted-xs"

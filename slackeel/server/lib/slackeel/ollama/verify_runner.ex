@@ -63,7 +63,11 @@ defmodule Slackeel.Ollama.VerifyRunner do
 
     mode = if serial?, do: :serial, else: :phased
 
-    IO.puts(:stderr, "slackeel.verify_ollama: #{length(models)} model(s), mode=#{mode}, parallel=#{parallel}, retries=#{retries}")
+    IO.puts(
+      :stderr,
+      "slackeel.verify_ollama: #{length(models)} model(s), mode=#{mode}, parallel=#{parallel}, retries=#{retries}"
+    )
+
     IO.puts(:stderr, "  pull: #{if pull?, do: "yes (parallel=#{pull_parallel})", else: "no"}")
     IO.puts(:stderr, "  unload: #{if unload?, do: "yes", else: "no"}")
 
@@ -132,7 +136,9 @@ defmodule Slackeel.Ollama.VerifyRunner do
 
   defp mix_stderr_log(:phased, {_model, :pull, :started}), do: :ok
   defp mix_stderr_log(:phased, {model, :pull, :ok}), do: IO.puts(:stderr, "  pull OK   #{model}")
-  defp mix_stderr_log(:phased, {model, :pull, {:error, e}}), do: IO.puts(:stderr, "  pull FAIL #{model} — #{format_err(e)}")
+
+  defp mix_stderr_log(:phased, {model, :pull, {:error, e}}),
+    do: IO.puts(:stderr, "  pull FAIL #{model} — #{format_err(e)}")
 
   defp mix_stderr_log(:phased, {_m, :probe, :started}), do: IO.puts(:stderr, "Phase: probe")
   defp mix_stderr_log(:phased, {_model, :probe, {:ok, _, _}}), do: :ok
@@ -141,11 +147,18 @@ defmodule Slackeel.Ollama.VerifyRunner do
 
   defp mix_stderr_log(:phased, {m, :unload, :started}), do: IO.puts(:stderr, "  unload → #{m}")
   defp mix_stderr_log(:phased, {_m, :unload, :ok}), do: :ok
-  defp mix_stderr_log(:phased, {_m, :unload, {:error, e}}), do: IO.puts(:stderr, "  unload WARN — #{format_err(e)}")
-  defp mix_stderr_log(:phased, {_m, :unload, other}), do: IO.puts(:stderr, "  unload note — #{inspect(other)}")
+
+  defp mix_stderr_log(:phased, {_m, :unload, {:error, e}}),
+    do: IO.puts(:stderr, "  unload WARN — #{format_err(e)}")
+
+  defp mix_stderr_log(:phased, {_m, :unload, other}),
+    do: IO.puts(:stderr, "  unload note — #{inspect(other)}")
 
   defp mix_stderr_log(:serial, {model, :pull, :ok}), do: IO.puts(:stderr, "  pull OK   #{model}")
-  defp mix_stderr_log(:serial, {model, :pull, {:error, e}}), do: IO.puts(:stderr, "  pull FAIL #{model} — #{format_err(e)}")
+
+  defp mix_stderr_log(:serial, {model, :pull, {:error, e}}),
+    do: IO.puts(:stderr, "  pull FAIL #{model} — #{format_err(e)}")
+
   defp mix_stderr_log(:serial, {_model, :probe, {:ok, text, meta}}) do
     prev = text |> String.replace("\n", " ") |> String.slice(0, 120)
     tps = meta[:tokens_per_sec]

@@ -69,6 +69,14 @@ config :phoenix, :stacktrace_depth, 20
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
 
+default_dev_db_url = "postgresql://postgres:postgres@127.0.0.1:5432/slackeel_dev"
+
+config :slackeel, Slackeel.Repo,
+  url: System.get_env("DATABASE_URL", default_dev_db_url),
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10
+
 config :phoenix_live_view,
   # Include debug annotations and locations in rendered markup.
   # Changing this configuration will require mix clean and a full recompile.

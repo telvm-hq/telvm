@@ -63,8 +63,12 @@ defmodule Slackeel.Preflight.MetricsRemote do
   defp parse_body(body) do
     free =
       cond do
-        v = body["free_bytes"] -> coerce_non_neg_int(v)
-        v = body["disk_free_bytes"] -> coerce_non_neg_int(v)
+        v = body["free_bytes"] ->
+          coerce_non_neg_int(v)
+
+        v = body["disk_free_bytes"] ->
+          coerce_non_neg_int(v)
+
         is_map(body["metrics"]) ->
           coerce_non_neg_int(body["metrics"]["free_bytes"])
 

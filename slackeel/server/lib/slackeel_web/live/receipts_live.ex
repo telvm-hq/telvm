@@ -7,6 +7,9 @@ defmodule SlackeelWeb.ReceiptsLive do
   """
   use SlackeelWeb, :live_view
 
+  alias Slackeel.Ollama.HotRegistry
+  alias Slackeel.Preflight.DiskDuo
+
   @doc """
   Five recent `slackapi/node-slack-sdk` issues (semver, supply chain, API shape, DX, i18n headers).
   States verified against GitHub on 2026-04-20 (US) — refresh if badges look stale.
@@ -62,7 +65,8 @@ defmodule SlackeelWeb.ReceiptsLive do
         repo: "slackapi/node-slack-sdk",
         number: 2544,
         opened_on: ~D[2026-04-07],
-        title: "When using in Windows-Japanese-Admin-powershell, App.run failed due to invalid User-Agent",
+        title:
+          "When using in Windows-Japanese-Admin-powershell, App.run failed due to invalid User-Agent",
         url: "https://github.com/slackapi/node-slack-sdk/issues/2544",
         theme: "Instrumentation / i18n headers",
         state: :closed,
@@ -143,11 +147,16 @@ defmodule SlackeelWeb.ReceiptsLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    hot = HotRegistry.snapshot()
+    disk = DiskDuo.load()
+
     {:ok,
      assign(socket,
        page_title: "Receipts",
        top_bar_title: nil,
        snapshot: nil,
+       hot_snapshot: hot,
+       disk_duo: disk,
        show_ollama_hud: false,
        verify_running: false,
        node_receipts: node_slack_sdk_receipts(),
@@ -164,12 +173,15 @@ defmodule SlackeelWeb.ReceiptsLive do
           <h1 class="text-xs font-semibold uppercase tracking-wide telvm-accent-text sm:text-sm">
             Receipts
           </h1>
+
           <span class="telvm-muted-xs text-[10px] tracking-tight">
             slackapi/node-slack-sdk · slackapi/python-slack-sdk
           </span>
         </div>
+
         <p class="max-w-4xl text-[11px] leading-relaxed text-[var(--telvm-shell-muted)] sm:text-xs">
-          Ten <strong class="text-[var(--telvm-shell-fg)]">recent</strong> issues from Slack’s own Node and Python SDK repos (2025–2026): breaking upgrades, supply-chain posture,
+          Ten <strong class="text-[var(--telvm-shell-fg)]">recent</strong>
+          issues from Slack’s own Node and Python SDK repos (2025–2026): breaking upgrades, supply-chain posture,
           API/Webhook parity, OAuth gaps, and logging footguns. Bolt-JS is intentionally omitted here—this tab is SDK-only.
           Slackeel is not a Slack client; compare vendor integration tax to a localhost-first Phoenix stack (see the
           <a
@@ -202,7 +214,8 @@ defmodule SlackeelWeb.ReceiptsLive do
 
       <p class="text-[9px] leading-snug text-[var(--telvm-shell-muted)] sm:text-[10px]">
         Slack and related marks are trademarks of Slack Technologies, LLC. Issue titles are quoted from public GitHub threads;
-        <strong class="text-[var(--telvm-shell-fg)]">Opened</strong> is the GitHub created date at curation time. Open/closed state may change after this build.
+        <strong class="text-[var(--telvm-shell-fg)]">Opened</strong>
+        is the GitHub created date at curation time. Open/closed state may change after this build.
       </p>
     </div>
     """
@@ -219,32 +232,35 @@ defmodule SlackeelWeb.ReceiptsLive do
       class="slac-card telvm-verify-card telvm-panel-border flex h-full min-h-0 flex-col overflow-hidden border border-[color:var(--telvm-shell-border)] font-mono"
     >
       <div class="slac-card__hdr flex shrink-0 !py-1 flex-wrap items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--telvm-shell-muted)]">
-        <span>{@title}</span>
-        <span class="tabular-nums">{length(@rows)} threads</span>
+        <span>{@title}</span> <span class="tabular-nums">{length(@rows)} threads</span>
       </div>
+
       <div class="slac-card__body flex min-h-[17rem] flex-1 flex-col overflow-auto !pt-1.5 lg:min-h-[20rem]">
         <table class="w-full min-w-0 table-fixed text-left text-[10px] sm:text-[11px]">
           <colgroup>
-            <col class="w-[2.75rem]" />
-            <col class="w-[5.25rem]" />
-            <col class="min-w-0" />
-            <col class="w-[3.5rem]" />
-            <col class="w-[36%]" />
+            <col class="w-[2.75rem]" /> <col class="w-[5.25rem]" /> <col class="min-w-0" />
+            <col class="w-[3.5rem]" /> <col class="w-[36%]" />
           </colgroup>
+
           <thead class="sticky top-0 z-[1] border-b border-[color:var(--telvm-shell-border)] bg-[color-mix(in_oklch,var(--telvm-shell-elevated)_88%,var(--telvm-shell-bg))]">
             <tr>
               <th class="whitespace-nowrap px-1.5 py-1 font-semibold sm:px-2 sm:py-1.5">#</th>
+
               <th class="whitespace-nowrap px-1.5 py-1 font-semibold sm:px-2 sm:py-1.5">Opened</th>
+
               <th class="px-1.5 py-1 text-left font-semibold sm:px-2 sm:py-1.5">
                 <span class="block leading-tight">Title</span>
                 <span class="mt-0.5 block text-[8px] font-normal normal-case tracking-normal text-[var(--telvm-shell-muted)]">
                   Theme
                 </span>
               </th>
+
               <th class="whitespace-nowrap px-1.5 py-1 font-semibold sm:px-2 sm:py-1.5">State</th>
+
               <th class="px-1.5 py-1 font-semibold sm:px-2 sm:py-1.5">Slackeel contrast</th>
             </tr>
           </thead>
+
           <tbody>
             <tr
               :for={r <- @rows}
@@ -253,9 +269,11 @@ defmodule SlackeelWeb.ReceiptsLive do
               <td class="whitespace-nowrap px-1.5 py-1.5 tabular-nums text-[var(--telvm-shell-muted)] sm:px-2 sm:py-2">
                 {r.number}
               </td>
+
               <td class="whitespace-nowrap px-1.5 py-1.5 tabular-nums text-[var(--telvm-shell-muted)] sm:px-2 sm:py-2">
                 {Calendar.strftime(r.opened_on, "%Y-%m-%d")}
               </td>
+
               <td class="min-w-0 px-1.5 py-2 sm:px-2 sm:py-2.5">
                 <div class="flex min-w-0 flex-col gap-1.5">
                   <a
@@ -277,6 +295,7 @@ defmodule SlackeelWeb.ReceiptsLive do
                   </div>
                 </div>
               </td>
+
               <td class="whitespace-nowrap px-1.5 py-1.5 align-top sm:px-2 sm:py-2">
                 <span class={[
                   "inline-flex rounded-sm border px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider sm:px-1.5 sm:text-[9px]",
@@ -285,6 +304,7 @@ defmodule SlackeelWeb.ReceiptsLive do
                   {receipt_state_label(r.state)}
                 </span>
               </td>
+
               <td class="min-w-0 px-1.5 py-1.5 text-[9px] leading-snug text-[var(--telvm-shell-muted)] sm:px-2 sm:py-2 sm:text-[10px]">
                 <span class="line-clamp-4 break-words">{r.contrast}</span>
               </td>

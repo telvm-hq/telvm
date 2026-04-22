@@ -60,7 +60,9 @@ defmodule Slackeel.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:req, "~> 0.5.0"}
+      {:req, "~> 0.5.0"},
+      {:ecto_sql, "~> 3.12"},
+      {:postgrex, ">= 0.0.0"}
     ]
   end
 
@@ -72,7 +74,9 @@ defmodule Slackeel.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "assets.setup", "assets.build"],
+      setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
+      "ecto.setup": ["ecto.create -r Slackeel.Repo", "ecto.migrate -r Slackeel.Repo"],
+      "ecto.reset": ["ecto.drop -r Slackeel.Repo", "ecto.setup"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind slackeel", "esbuild slackeel"],
       "assets.deploy": [

@@ -120,7 +120,12 @@ defmodule Slackeel.Ollama.VerifyPipeline do
             {[run_cycle.(model) | acc], false}
           else
             log(opts, "[#{ts()}] · verify · stopped by user (remaining models skipped)")
-            notify(opts, {:notify, {:log, "[#{ts()}] · verify · stopped by user (remaining models skipped)"}})
+
+            notify(
+              opts,
+              {:notify, {:log, "[#{ts()}] · verify · stopped by user (remaining models skipped)"}}
+            )
+
             {acc, true}
           end
         end
@@ -142,8 +147,14 @@ defmodule Slackeel.Ollama.VerifyPipeline do
         prev = text |> to_string() |> String.replace("\n", " ") |> String.slice(0, 160)
         tps = meta[:tokens_per_sec]
         tps_note = if tps, do: " · #{tps} tok/s", else: ""
-        log(opts, "[#{ts()}] #{model} · probe · ok (#{byte_size(to_string(text))} B)#{tps_note} #{prev}")
+
+        log(
+          opts,
+          "[#{ts()}] #{model} · probe · ok (#{byte_size(to_string(text))} B)#{tps_note} #{prev}"
+        )
+
         notify(opts, {:notify, {model, :probe, {:ok, text, meta}}})
+
         if unload? do
           log(opts, "[#{ts()}] #{model} · unload · POST /api/chat keep_alive=0")
           notify(opts, {:notify, {model, :unload, :started}})

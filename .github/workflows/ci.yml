@@ -64,6 +64,22 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: hexpm/elixir:1.17.3-erlang-27.3.2-debian-bookworm-20250317-slim
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: slackeel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/slackeel_test
     steps:
       - uses: actions/checkout@v6
 
@@ -73,10 +89,12 @@ jobs:
             build-essential git curl ca-certificates \
           && rm -rf /var/lib/apt/lists/*
 
-      - name: mix deps.get + test
+      - name: mix deps.get + ecto + test
         working-directory: slackeel/server
         run: |
           mix local.hex --force
           mix local.rebar --force
           mix deps.get
+          mix ecto.create --quiet
+          mix ecto.migrate --quiet
           mix test

@@ -25,6 +25,43 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/slackeel"
 import topbar from "../vendor/topbar"
 
+/**
+ * Chat /chat message feed: follow new tokens when streaming, or if user is near
+ * the bottom; otherwise do not yank the scroll when reading history.
+ */
+const ChatFeedScroll = {
+  SCROLL_AT_BOTTOM_PX: 64,
+
+  mounted() {
+    this.scrollToBottom()
+  },
+
+  updated() {
+    this.maybeScrollToBottom()
+  },
+
+  scrollToBottom() {
+    const el = this.el
+    if (!el || el.scrollHeight === 0) return
+    el.scrollTop = el.scrollHeight
+  },
+
+  maybeScrollToBottom() {
+    const el = this.el
+    if (!el) return
+    const pending = this.el.dataset?.chatPending === "true"
+    if (pending) {
+      this.scrollToBottom()
+      return
+    }
+    const h = el.scrollHeight - el.clientHeight
+    if (h <= 0) return
+    if (h - el.scrollTop <= this.SCROLL_AT_BOTTOM_PX) {
+      this.scrollToBottom()
+    }
+  },
+}
+
 /** Auto-scroll structured verify log (Preflight Ollama verify). */
 const ScrollProbeLog = {
   mounted() {
@@ -55,11 +92,69 @@ const MissionBoard = {
   },
 }
 
+/** Pulse model rows + sync progress fills from `push_event("hot_model_phase", ...)`. */
+const HotModelPhase = {
+  mounted() {
+    this._onPhase = (detail) => {
+      const tag = detail?.tag
+      const phase = detail?.phase
+      if (!tag || !phase) return
+      const esc = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(tag) : String(tag).replace(/"/g, "")
+      const rows = this.el.querySelectorAll(`[data-hot-tag="${esc}"]`)
+      if (!rows || rows.length === 0) return
+
+      rows.forEach((row) => {
+        row.classList.remove("telvm-hot-row--js-pulse")
+        void row.offsetWidth
+        row.classList.add("telvm-hot-row--js-pulse")
+        row.dataset.hotPhase = phase
+
+        const fill = row.querySelector("[data-hot-progress-fill]")
+        if (fill) {
+          const p = detail.load_pct
+          if (typeof p === "number" && Number.isFinite(p)) {
+            fill.classList.remove("telvm-progress-fill--indeterminate")
+            fill.style.width = `${Math.min(100, Math.max(0, p))}%`
+          } else if (phase === "loading" || phase === "streaming") {
+            fill.classList.add("telvm-progress-fill--indeterminate")
+            fill.style.width = "32%"
+          }
+        }
+
+        const unloadFill = row.querySelector("[data-hot-unload-fill]")
+        if (unloadFill) {
+          if (detail.unload_busy) {
+            unloadFill.classList.add("telvm-progress-fill--unload-indeterminate")
+          } else {
+            unloadFill.classList.remove("telvm-progress-fill--unload-indeterminate")
+          }
+        }
+      })
+
+      const chatFill = this.el.querySelector("[data-chat-load-fill]")
+      if (chatFill && detail.tag && String(detail.tag) === String(this.el.dataset?.chatPendingModel || "")) {
+        const p2 = detail.load_pct
+        if (typeof p2 === "number" && Number.isFinite(p2)) {
+          chatFill.classList.remove("telvm-progress-fill--indeterminate")
+          chatFill.style.width = `${Math.min(100, Math.max(0, p2))}%`
+        }
+      }
+    }
+    this.handleEvent("hot_model_phase", this._onPhase)
+  },
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, ScrollProbeLog, MissionBoard},
+  hooks: {
+    ...colocatedHooks,
+    ScrollProbeLog,
+    MissionBoard,
+    HotModelPhase,
+    ChatFeedScroll,
+  },
 })
 
 // Show progress bar on live navigation and form submits
