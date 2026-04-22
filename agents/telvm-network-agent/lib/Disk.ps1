@@ -16,9 +16,11 @@ function Get-PreflightDiskSummary {
     if ($cap -gt 0) {
       $free = [long]$_.Free
       if ($free -lt $min) { $min = $free }
+      $root = $null
+      try { $root = $_.Root } catch { }
       [void]$volumes.Add(@{
         name           = $_.Name
-        root           = try { $_.Root } catch { $null }
+        root           = $root
         free_bytes     = $free
         used_bytes     = [long]$_.Used
         capacity_bytes = [long]$cap
