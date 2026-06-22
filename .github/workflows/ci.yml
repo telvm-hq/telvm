@@ -10,7 +10,7 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: MCP package (Node)
         uses: actions/setup-node@v4
@@ -43,7 +43,7 @@ jobs:
     container:
       image: hexpm/elixir:1.17.3-erlang-27.3.2-debian-bookworm-20250317-slim
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: OS packages (node, build tools)
         run: |
@@ -81,7 +81,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/slackeel_test
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: OS packages (build tools)
         run: |
